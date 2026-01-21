@@ -9,12 +9,11 @@ def create_img_dir():
     directory_name = "img"
     try:
         os.mkdir(directory_name)
-    except FileExistsError:
-        print(f"Directory '{directory_name}' already exists.")
     except PermissionError:
         print(f"Permission denied: Unable to create '{directory_name}'.")
     except Exception as e:
         print(f"An error occurred: {e}")
+    open(os.path.join("img", ".gitkeep"), "w")
 
 
 def convert(pdf_file):
