@@ -1,0 +1,26 @@
+import os
+
+import processing_images
+import processing_pdf
+import processing_text
+
+
+def run_ai_ocr(pdf_file, api_key, model="z-ai/glm-4.6v"):
+    print("Convirtiendo PDF a imágenes")
+    processing_pdf.convert(pdf_file)
+    print("Pasando imágenes a la IA")
+    processing_images.ocr(api_key, model)
+    print("Procesando salida de la IA")
+    processing_text.to_md(
+        "output.json", pdf_file.removesuffix(".pdf").removeprefix("docs/")
+    )
+    print("Listo!")
+
+
+pdfs = os.listdir("docs/")
+key = str(input("Ingresa tu API de OpenRouter: "))
+model = str(input("Ingresa el modelo a utilizar (GLM 4.6V por defecto): "))
+
+for doc in pdfs:
+    print(f"Procesando {doc}")
+    run_ai_ocr("docs/" + doc, key, model)
