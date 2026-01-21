@@ -7,3 +7,4 @@ output/*
 !docs/.gitkeep
 !img/.gitkeep
 !output/.gitkeep
+output.json
