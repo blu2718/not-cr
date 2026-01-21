@@ -4,3 +4,6 @@ __pycache__/processing_text.cpython-311.pyc
 docs/*
 img/*
 output/*
+!docs/.gitkeep
+!img/.gitkeep
+!output/.gitkeep
