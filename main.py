@@ -5,7 +5,7 @@ import processing_pdf
 import processing_text
 
 
-def run_ai_ocr(pdf_file, api_key, model="z-ai/glm-4.6v"):
+def run_ai_ocr(pdf_file, api_key, model):
     print("Convirtiendo PDF a imágenes")
     processing_pdf.convert(pdf_file)
     print("Pasando imágenes a la IA")
@@ -17,9 +17,17 @@ def run_ai_ocr(pdf_file, api_key, model="z-ai/glm-4.6v"):
     print("Listo!")
 
 
-pdfs = os.listdir("docs/")
+pdfs = []
+
+for file in os.listdir("docs/"):
+    if file.endswith(".pdf"):
+        pdfs.append(file)
+ 
 key = str(input("Ingresa tu API de OpenRouter: "))
 model = str(input("Ingresa el modelo a utilizar (GLM 4.6V por defecto): "))
+
+if model == "":
+    model = "z-ai/glm-4.6v"
 
 for doc in pdfs:
     print(f"Procesando {doc}")
