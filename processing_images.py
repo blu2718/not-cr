@@ -36,7 +36,7 @@ Recibirás múltiples imágenes que representan las páginas de un documento ori
 [Texto: "El área del círculo es"] [Símbolo matemático: A = pi r^2]
 
 ## Salida esperada:
-El área del círculo es $A = \\pi r^2$
+El área del círculo es $A = \pi r^2$
 
 ## Entrada (descripción visual):
 [Imagen: Gráfico de barras mostrando ventas]
@@ -45,13 +45,19 @@ El área del círculo es $A = \\pi r^2$
 (Imagen: Gráfico de barras mostrando ventas anuales)
 """
 
+
 def encode_image_to_base64(image_path):
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode("utf-8")
 
 
 def ocr(api_key, model, ocr_prompt=prompt):
-    images = os.listdir("img/")
+    images = []
+
+    for img in os.listdir("img/"):
+        if img.endswith(".jpg"):
+            images.append(img)
+
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
