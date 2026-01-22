@@ -24,10 +24,10 @@ for file in os.listdir("docs/"):
         pdfs.append(file)
  
 key = str(input("Ingresa tu API de OpenRouter: "))
-model = str(input("Ingresa el modelo a utilizar (GLM 4.6V por defecto): "))
+model = str(input("Ingresa el modelo a utilizar (Qwen3 VL 235B A22B Instruct por defecto): "))
 
 if model == "":
-    model = "z-ai/glm-4.6v"
+    model = "qwen/qwen3-vl-235b-a22b-instruct"
 
 for doc in pdfs:
     print(f"Procesando {doc}")
