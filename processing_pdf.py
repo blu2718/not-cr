@@ -17,11 +17,11 @@ def create_img_dir():
 
 
 def convert(pdf_file):
-    print("Creando directorio")
+    print("├ Creando directorio")
 
     create_img_dir()
 
-    print("Convirtiendo")
+    print("└ Convirtiendo")
 
     convert_from_path(
         pdf_file,

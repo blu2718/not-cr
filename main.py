@@ -30,5 +30,5 @@ if model == "":
     model = "qwen/qwen3-vl-235b-a22b-instruct"
 
 for doc in pdfs:
-    print(f"Procesando {doc}")
+    print(f"[ Procesando {doc} ]")
     run_ai_ocr("docs/" + doc, key, model)

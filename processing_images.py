@@ -63,7 +63,7 @@ def ocr(api_key, model, ocr_prompt=prompt):
 
     image_content = [{"type": "text", "text": ocr_prompt}]
 
-    print("Construyendo mensaje")
+    print("├ Construyendo mensaje")
     for img in images:
         base64_image = encode_image_to_base64("img/" + img)
         data_url = f"data:image/jpeg;base64,{base64_image}"
@@ -71,15 +71,15 @@ def ocr(api_key, model, ocr_prompt=prompt):
 
     messages = [{"role": "user", "content": image_content}]
 
-    print("Enviando solicitud al modelo")
+    print("├ Enviando solicitud al modelo")
 
     payload = {"model": model, "messages": messages}
 
-    print("Esperando respuesta del modelo")
+    print("├ Esperando respuesta del modelo")
 
     response = requests.post(url, headers=headers, json=payload)
 
-    print("Respuesta recibida")
+    print("└ Respuesta recibida")
 
     with open("output.json", "w", encoding="utf-8") as f:
         json.dump(response.json(), f, indent=4, ensure_ascii=False)
