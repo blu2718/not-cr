@@ -1,4 +1,5 @@
 import os
+import json
 
 import processing_images
 import processing_pdf
@@ -23,11 +24,11 @@ for file in os.listdir("docs/"):
     if file.endswith(".pdf"):
         pdfs.append(file)
  
-key = str(input("Ingresa tu API de OpenRouter: "))
-model = str(input("Ingresa el modelo a utilizar (Qwen3 VL 235B A22B Instruct por defecto): "))
+with open("config.json", "r") as file:
+    config = json.load(file)
 
-if model == "":
-    model = "qwen/qwen3-vl-235b-a22b-instruct"
+key = config["openrouter"]["api-key"]
+model = config["openrouter"]["model"]
 
 for doc in pdfs:
     print(f"[ Procesando {doc} ]")
