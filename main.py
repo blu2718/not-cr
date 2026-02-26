@@ -9,12 +9,13 @@ import processing_text
 def run_ai_ocr(pdf_file, api_key, model):
     print("Convirtiendo PDF a imágenes")
     processing_pdf.convert(pdf_file)
-    print("Pasando imágenes a la IA")
-    processing_images.ocr(api_key, model)
-    print("Procesando salida de la IA")
+
+    # TODO: agregar lógica para procesar el documento entero por lotes.
+
     processing_text.to_md(
         "output.json", pdf_file.removesuffix(".pdf").removeprefix("docs/")
     )
+
     print("Listo!")
 
 
@@ -23,7 +24,7 @@ pdfs = []
 for file in os.listdir("docs/"):
     if file.endswith(".pdf"):
         pdfs.append(file)
- 
+
 with open("config.json", "r") as file:
     config = json.load(file)
 
