@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}{{ output_name }} · not-cr{% endblock %}
+{% block content %}
+<div class="page-heading">
+    <div>
+        <p class="eyebrow">Resultado Markdown</p>
+        <h1>{{ output_name }}.md</h1>
+        <div class="badge-row">
+            <span class="tag {% if result.tag == 'sin etiqueta' %}tag--muted{% endif %}">{{ result.tag }}</span>
+            {% if result.provider %}<span class="tag tag--muted">{{ result.provider }}</span>{% endif %}
+            {% if result.date %}<span class="muted">{{ result.date }}</span>{% endif %}
+        </div>
+    </div>
+    <a class="btn btn--primary" href="{{ url_for('raw_output', name=output_name) }}">Descargar .md</a>
+</div>
+<section class="card output-card">
+    {% if meta %}
+        <div class="output-meta">
+            {% if totals.prompt_tokens or totals.completion_tokens %}
+                <span>{{ totals.prompt_tokens + totals.completion_tokens }} tokens ({{ totals.prompt_tokens }} entrada · {{ totals.completion_tokens }} salida)</span>
+            {% endif %}
+            {% if meta.get('estimated_cost') is not none %}<span>Coste estimado: ${{ "%.4f"|format(meta.get('estimated_cost')) }}</span>{% endif %}
+        </div>
+    {% endif %}
+    <article class="markdown-body">{{ rendered|safe }}</article>
+</section>
+{% endblock %}

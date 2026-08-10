@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Configuración · not-cr{% endblock %}
+{% block content %}
+<div class="page-heading">
+    <div>
+        <p class="eyebrow">Preferencias</p>
+        <h1>Configuración</h1>
+        <p class="lede">Las claves se guardan localmente en <code>config.json</code>.</p>
+    </div>
+</div>
+<form action="{{ url_for('config_page') }}" method="post" class="config-form">
+    <section class="card">
+        <div class="section-heading">
+            <div><p class="eyebrow">Ruta activa</p><h2>Proveedor por defecto</h2></div>
+        </div>
+        <div class="provider-radios">
+            {% for name in provider_names %}
+                <label class="radio-card"><input type="radio" name="active" value="{{ name }}" {% if config.active == name %}checked{% endif %}><span><strong>{{ name }}</strong><small>{{ config[name].get('api-url', '') }}</small></span></label>
+            {% endfor %}
+        </div>
+    </section>
+    {% for name in provider_names %}
+        {% set provider = config[name] %}
+        <section class="card provider-card">
+            <div class="section-heading">
+                <div><p class="eyebrow">Proveedor</p><h2>{{ name }}</h2></div>
+                <span class="tag {% if config.active == name %}tag--ok{% else %}tag--muted{% endif %}">{% if config.active == name %}activo{% else %}disponible{% endif %}</span>
+            </div>
+            <div class="form-grid">
+                <div class="field field--wide"><label for="{{ name }}-api-url">URL base de API</label><input id="{{ name }}-api-url" name="{{ name }}-api-url" type="url" value="{{ provider.get('api-url', '') }}" required></div>
+                <div class="field field--wide"><label for="{{ name }}-api-key">API key</label><input id="{{ name }}-api-key" name="{{ name }}-api-key" type="password" value="{{ provider.get('api-key', '') }}" autocomplete="off"></div>
+                <div class="field"><label for="{{ name }}-model">Modelo por defecto</label><input id="{{ name }}-model" name="{{ name }}-model" type="text" value="{{ provider.get('model', '') }}"></div>
+                <div class="field"><label for="{{ name }}-reasoning">Razonamiento por defecto</label><select id="{{ name }}-reasoning" name="{{ name }}-reasoning"><option value="" {% if not provider.get('reasoning') %}selected{% endif %}>No enviar</option>{% for effort in ['low', 'medium', 'high'] %}<option value="{{ effort }}" {% if provider.get('reasoning') == effort %}selected{% endif %}>{{ effort }}</option>{% endfor %}</select></div>
+            </div>
+            <button class="btn btn--secondary" type="submit" formaction="{{ url_for('test_config', provider=name) }}" formmethod="post">Probar conexión</button>
+        </section>
+    {% endfor %}
+    <div class="form-actions"><button class="btn btn--primary" type="submit">Guardar configuración</button></div>
+</form>
+{% endblock %}

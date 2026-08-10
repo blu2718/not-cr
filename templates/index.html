@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Documentos · not-cr{% endblock %}
+{% block content %}
+<section class="hero-row">
+    <div>
+        <p class="eyebrow">OCR multimodal</p>
+        <h1>Convierte tus documentos</h1>
+        <p class="lede">PDF a Markdown por lotes, con resultados separados por modelo.</p>
+    </div>
+    <form class="upload-form" action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data">
+        <label for="pdf-file">Subir PDF</label>
+        <div class="inline-form">
+            <input id="pdf-file" type="file" name="file" accept="application/pdf,.pdf" required>
+            <button class="btn btn--primary" type="submit">Subir</button>
+        </div>
+    </form>
+</section>
+
+<section class="card">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">Biblioteca</p>
+            <h2>Archivos subidos</h2>
+        </div>
+        <span class="count">{{ documents|length }}</span>
+    </div>
+    {% if documents %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr><th>Documento</th><th>Tamaño</th><th>Resultados</th></tr>
+                </thead>
+                <tbody>
+                {% for document in documents %}
+                    <tr>
+                        <td><a class="file-link" href="{{ url_for('document', name=document.name) }}">{{ document.filename }}</a></td>
+                        <td class="muted">{{ document.size|filesize }}</td>
+                        <td class="muted">{{ document.results_count }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="empty-state">Aún no hay PDFs. Sube el primero para empezar.</p>
+    {% endif %}
+</section>
+
+<section class="card">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">Historial</p>
+            <h2>Resultados anteriores</h2>
+        </div>
+    </div>
+    {% if result_groups %}
+        <div class="result-groups">
+        {% for group in result_groups %}
+            <div class="result-group">
+                <h3><a href="{{ url_for('document', name=group.doc) }}">{{ group.doc }}.pdf</a></h3>
+                <div class="result-list">
+                {% for result in group.results %}
+                    <div class="result-row">
+                        <a class="result-name" href="{{ url_for('output_view', name=result.name) }}">{{ result.name }}.md</a>
+                        <span class="tag {% if result.tag == 'sin etiqueta' %}tag--muted{% endif %}">{{ result.tag }}</span>
+                        {% if result.provider %}<span class="muted">{{ result.provider }}</span>{% endif %}
+                        <span class="muted result-date">{{ result.date }}</span>
+                        <a class="text-link" href="{{ url_for('raw_output', name=result.name) }}">descargar</a>
+                    </div>
+                {% endfor %}
+                </div>
+            </div>
+        {% endfor %}
+        </div>
+    {% else %}
+        <p class="empty-state">Todavía no hay resultados.</p>
+    {% endif %}
+</section>
+{% endblock %}

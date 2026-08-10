@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}{{ document }} · not-cr{% endblock %}
+{% block head %}<script src="{{ url_for('static', filename='combobox.js') }}" defer></script>{% endblock %}
+{% block content %}
+<div class="page-heading">
+    <div>
+        <p class="eyebrow">Documento</p>
+        <h1>{{ document }}.pdf</h1>
+    </div>
+    <a class="btn btn--secondary" href="{{ url_for('index') }}">Volver</a>
+</div>
+
+<div class="two-column doc-layout">
+    <section class="card preview-card">
+        <div class="section-heading">
+            <h2>Previsualización</h2>
+            <a class="text-link" target="_blank" rel="noopener" href="{{ url_for('document_file', name=document) }}">Abrir PDF</a>
+        </div>
+        <embed class="pdf-preview" src="{{ url_for('document_file', name=document) }}" type="application/pdf">
+        <p class="fallback-link"><a class="text-link" target="_blank" rel="noopener" href="{{ url_for('document_file', name=document) }}">Abrir PDF en una pestaña nueva</a></p>
+    </section>
+
+    <div class="stack">
+        <section class="card">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Nueva corrida</p>
+                    <h2>Procesar con {{ provider_name }}</h2>
+                </div>
+                <span class="tag tag--muted">por lote</span>
+            </div>
+            <form action="{{ url_for('process', name=document) }}" method="post" class="process-form">
+                <div class="field" data-model-combo data-provider="{{ provider_name }}" data-models-url="{{ url_for('api_models') }}?provider={{ provider_name|urlencode }}">
+                    <label for="model-search">Modelo</label>
+                    <div class="combo">
+                        <input id="model-search" type="text" role="combobox" aria-expanded="false" aria-controls="model-options" aria-autocomplete="list" autocomplete="off" value="{{ provider.get('model', '') }}" data-default-model="{{ provider.get('model', '') }}">
+                        <ul id="model-options" class="combo-list" role="listbox" hidden></ul>
+                    </div>
+                    <input id="model-value" type="hidden" name="model" value="{{ provider.get('model', '') }}">
+                    <p id="model-error" class="field-note" hidden></p>
+                    <p id="model-meta" class="model-meta" aria-live="polite"></p>
+                </div>
+                <div class="field">
+                    <label for="reasoning">Nivel de razonamiento</label>
+                    <select id="reasoning" name="reasoning">
+                        <option value="" selected>Por defecto del proveedor ({{ provider.get('reasoning') or 'no enviar' }})</option>
+                        <option value="low">low</option>
+                        <option value="medium">medium</option>
+                        <option value="high">high</option>
+                        <option value="off">No enviar</option>
+                    </select>
+                    <p id="reasoning-note" class="field-note"></p>
+                </div>
+                <button class="btn btn--primary btn--wide" type="submit">Procesar PDF</button>
+            </form>
+        </section>
+
+        <section class="card">
+            <div class="section-heading"><h2>Resultados de este documento</h2></div>
+            {% if results %}
+                <div class="result-list">
+                {% for result in results %}
+                    <div class="result-row result-row--stacked">
+                        <div class="result-main">
+                            <a class="result-name" href="{{ url_for('output_view', name=result.name) }}">{{ result.name }}.md</a>
+                            <span class="tag {% if result.tag == 'sin etiqueta' %}tag--muted{% endif %}">{{ result.tag }}</span>
+                        </div>
+                        <div class="result-secondary">
+                            {% if result.provider %}<span class="muted">{{ result.provider }}</span>{% endif %}
+                            <span class="muted">{{ result.date }}</span>
+                            <a class="text-link" href="{{ url_for('raw_output', name=result.name) }}">descargar</a>
+                        </div>
+                    </div>
+                {% endfor %}
+                </div>
+            {% else %}
+                <p class="empty-state">Aún no hay resultados para este documento…</p>
+            {% endif %}
+        </section>
+    </div>
+</div>
+{% endblock %}
