@@ -57,7 +57,10 @@
         <div class="result-groups">
         {% for group in result_groups %}
             <div class="result-group">
-                <h3><a href="{{ url_for('document', name=group.doc) }}">{{ group.doc }}.pdf</a></h3>
+                <h3 class="result-group-title">
+                    <a href="{{ url_for('document', name=group.doc) }}">{{ group.doc }}.pdf</a>
+                    <span class="result-count">{{ group.results|length }} {% if group.results|length == 1 %}resultado{% else %}resultados{% endif %}</span>
+                </h3>
                 <div class="result-list">
                 {% for result in group.results %}
                     <div class="result-row">
