@@ -4,7 +4,17 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}not-cr{% endblock %}</title>
+    <script>
+        (() => {
+            try {
+                const saved = localStorage.getItem("not-cr-theme");
+                const dark = saved === "dark" || (!saved && window.matchMedia("(prefers-color-scheme: dark)").matches);
+                if (dark) document.documentElement.dataset.theme = "dark";
+            } catch (_error) {}
+        })();
+    </script>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="{{ url_for('static', filename='theme.js') }}" defer></script>
     {% block head %}{% endblock %}
 </head>
 <body>
@@ -14,6 +24,7 @@
             <nav aria-label="Navegación principal">
                 <a href="{{ url_for('index') }}">Documentos</a>
                 <a href="{{ url_for('config_page') }}">Configuración</a>
+                <button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false" aria-label="Activar modo oscuro">Modo oscuro</button>
             </nav>
         </div>
     </header>
