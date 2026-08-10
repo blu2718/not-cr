@@ -1,6 +1,8 @@
 __pycache__/processing_images.cpython-311.pyc
 __pycache__/processing_pdf.cpython-311.pyc
 __pycache__/processing_text.cpython-311.pyc
+__pycache__/
+config.json
 docs/*
 img/*
 output/*
