@@ -30,15 +30,15 @@
                 <span class="tag tag--muted">por lote</span>
             </div>
             <form action="{{ url_for('process', name=document) }}" method="post" class="process-form">
-                <div class="field" data-model-combo data-provider="{{ provider_name }}" data-models-url="{{ url_for('api_models') }}?provider={{ provider_name|urlencode }}">
+                <div class="field" data-model-combo data-provider="{{ provider_name }}" data-models-url="{{ url_for('api_models') }}?provider={{ provider_name|urlencode }}" data-reasoning-id="reasoning" data-reasoning-note-id="reasoning-note">
                     <label for="model-search">Modelo</label>
                     <div class="combo">
-                        <input id="model-search" type="text" role="combobox" aria-expanded="false" aria-controls="model-options" aria-autocomplete="list" autocomplete="off" value="{{ provider.get('model', '') }}" data-default-model="{{ provider.get('model', '') }}">
+                        <input id="model-search" data-model-input type="text" role="combobox" aria-expanded="false" aria-controls="model-options" aria-autocomplete="list" autocomplete="off" value="{{ provider.get('model', '') }}" data-default-model="{{ provider.get('model', '') }}">
                         <ul id="model-options" class="combo-list" role="listbox" hidden></ul>
                     </div>
-                    <input id="model-value" type="hidden" name="model" value="{{ provider.get('model', '') }}">
-                    <p id="model-error" class="field-note" hidden></p>
-                    <p id="model-meta" class="model-meta" aria-live="polite"></p>
+                    <input id="model-value" data-model-value type="hidden" name="model" value="{{ provider.get('model', '') }}">
+                    <p id="model-error" data-model-error class="field-note" hidden></p>
+                    <p id="model-meta" data-model-meta class="model-meta" aria-live="polite"></p>
                 </div>
                 <div class="field">
                     <label for="reasoning">Nivel de razonamiento</label>

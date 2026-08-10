@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Configuración · not-cr{% endblock %}
+{% block head %}<script src="{{ url_for('static', filename='combobox.js') }}" defer></script>{% endblock %}
 {% block content %}
 <div class="page-heading">
     <div>
@@ -29,7 +30,16 @@
             <div class="form-grid">
                 <div class="field field--wide"><label for="{{ name }}-api-url">URL base de API</label><input id="{{ name }}-api-url" name="{{ name }}-api-url" type="url" value="{{ provider.get('api-url', '') }}" required></div>
                 <div class="field field--wide"><label for="{{ name }}-api-key">API key</label><input id="{{ name }}-api-key" name="{{ name }}-api-key" type="password" value="{{ provider.get('api-key', '') }}" autocomplete="off"></div>
-                <div class="field"><label for="{{ name }}-model">Modelo por defecto</label><input id="{{ name }}-model" name="{{ name }}-model" type="text" value="{{ provider.get('model', '') }}"></div>
+                <div class="field model-field" data-model-combo data-provider="{{ name }}" data-models-url="{{ url_for('api_models') }}?provider={{ name|urlencode }}">
+                    <label for="{{ name }}-model-search">Modelo por defecto</label>
+                    <div class="combo">
+                        <input id="{{ name }}-model-search" data-model-input type="text" role="combobox" aria-expanded="false" aria-controls="{{ name }}-model-options" aria-autocomplete="list" autocomplete="off" value="{{ provider.get('model', '') }}">
+                        <ul id="{{ name }}-model-options" class="combo-list" role="listbox" hidden></ul>
+                    </div>
+                    <input data-model-value type="hidden" name="{{ name }}-model" value="{{ provider.get('model', '') }}">
+                    <p data-model-error class="field-note" hidden></p>
+                    <p data-model-meta class="model-meta" aria-live="polite"></p>
+                </div>
                 <div class="field"><label for="{{ name }}-reasoning">Razonamiento por defecto</label><select id="{{ name }}-reasoning" name="{{ name }}-reasoning"><option value="" {% if not provider.get('reasoning') %}selected{% endif %}>No enviar</option>{% for effort in ['low', 'medium', 'high'] %}<option value="{{ effort }}" {% if provider.get('reasoning') == effort %}selected{% endif %}>{{ effort }}</option>{% endfor %}</select></div>
             </div>
             <button class="btn btn--secondary" type="submit" formaction="{{ url_for('test_config', provider=name) }}" formmethod="post">Probar conexión</button>
