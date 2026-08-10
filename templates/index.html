@@ -28,7 +28,7 @@
         <div class="table-wrap">
             <table>
                 <thead>
-                    <tr><th>Documento</th><th>Tamaño</th><th>Resultados</th></tr>
+                    <tr><th>Documento</th><th>Tamaño</th><th>Resultados</th><th></th></tr>
                 </thead>
                 <tbody>
                 {% for document in documents %}
@@ -36,6 +36,11 @@
                         <td><a class="file-link" href="{{ url_for('document', name=document.name) }}">{{ document.filename }}</a></td>
                         <td class="muted">{{ document.size|filesize }}</td>
                         <td class="muted">{{ document.results_count }}</td>
+                        <td>
+                            <form class="delete-form" action="{{ url_for('delete_document', name=document.name) }}" method="post" onsubmit="return confirm('¿Borrar este documento? Sus resultados se conservarán.');">
+                                <button class="btn btn--danger btn--small" type="submit">Borrar</button>
+                            </form>
+                        </td>
                     </tr>
                 {% endfor %}
                 </tbody>
@@ -58,7 +63,12 @@
         {% for group in result_groups %}
             <div class="result-group">
                 <h3 class="result-group-title">
-                    <a href="{{ url_for('document', name=group.doc) }}">{{ group.doc }}.pdf</a>
+                    {% if group.has_document %}
+                        <a href="{{ url_for('document', name=group.doc) }}">{{ group.doc }}.pdf</a>
+                    {% else %}
+                        <span class="result-group-document">{{ group.doc }}.pdf</span>
+                        <span class="tag tag--muted">PDF eliminado</span>
+                    {% endif %}
                     <span class="result-count">{{ group.results|length }} {% if group.results|length == 1 %}resultado{% else %}resultados{% endif %}</span>
                 </h3>
                 <div class="result-list">
@@ -69,6 +79,10 @@
                         {% if result.provider %}<span class="muted">{{ result.provider }}</span>{% endif %}
                         <span class="muted result-date">{{ result.date }}</span>
                         <a class="text-link" href="{{ url_for('raw_output', name=result.name) }}">descargar</a>
+                        <form class="delete-form" action="{{ url_for('delete_output', name=result.name) }}" method="post" onsubmit="return confirm('¿Borrar este resultado?');">
+                            <input type="hidden" name="back" value="index">
+                            <button class="btn btn--danger btn--small" type="submit">Borrar</button>
+                        </form>
                     </div>
                 {% endfor %}
                 </div>

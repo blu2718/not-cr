@@ -24,7 +24,12 @@
             {% if result.date %}<span class="muted">{{ result.date }}</span>{% endif %}
         </div>
     </div>
-    <a class="btn btn--primary" href="{{ url_for('raw_output', name=output_name) }}">Descargar .md</a>
+    <div class="page-actions">
+        <a class="btn btn--primary" href="{{ url_for('raw_output', name=output_name) }}">Descargar .md</a>
+        <form class="delete-form" action="{{ url_for('delete_output', name=output_name) }}" method="post" onsubmit="return confirm('¿Borrar este resultado?');">
+            <button class="btn btn--danger" type="submit">Borrar resultado</button>
+        </form>
+    </div>
 </div>
 <section class="card output-card">
     {% if meta %}

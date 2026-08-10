@@ -7,7 +7,12 @@
         <p class="eyebrow">Documento</p>
         <h1>{{ document }}.pdf</h1>
     </div>
-    <a class="btn btn--secondary" href="{{ url_for('index') }}">Volver</a>
+    <div class="page-actions">
+        <a class="btn btn--secondary" href="{{ url_for('index') }}">Volver</a>
+        <form class="delete-form" action="{{ url_for('delete_document', name=document) }}" method="post" onsubmit="return confirm('¿Borrar este documento? Sus resultados se conservarán.');">
+            <button class="btn btn--danger" type="submit">Borrar documento</button>
+        </form>
+    </div>
 </div>
 
 <div class="two-column doc-layout">
@@ -69,6 +74,10 @@
                             {% if result.provider %}<span class="muted">{{ result.provider }}</span>{% endif %}
                             <span class="muted">{{ result.date }}</span>
                             <a class="text-link" href="{{ url_for('raw_output', name=result.name) }}">descargar</a>
+                            <form class="delete-form" action="{{ url_for('delete_output', name=result.name) }}" method="post" onsubmit="return confirm('¿Borrar este resultado?');">
+                                <input type="hidden" name="back" value="document">
+                                <button class="btn btn--danger btn--small" type="submit">Borrar</button>
+                            </form>
                         </div>
                     </div>
                 {% endfor %}

@@ -151,6 +151,14 @@ def _pdf_path(stem: str) -> Path:
     return DOCS_DIR / f"{stem}.pdf"
 
 
+def _document_has_running_job(stem: str) -> bool:
+    with JOBS_LOCK:
+        return any(
+            job.get("status") == "running" and job.get("doc") == stem
+            for job in jobs.values()
+        )
+
+
 def _result_meta_path(path: Path) -> Path:
     return path.with_suffix(".meta.json")
 
@@ -362,8 +370,13 @@ def index():
     grouped = {}
     for result in results:
         grouped.setdefault(result["doc"], []).append(result)
+    document_names = {item["name"] for item in documents}
     result_groups = [
-        {"doc": doc, "results": grouped[doc]}
+        {
+            "doc": doc,
+            "results": grouped[doc],
+            "has_document": doc in document_names,
+        }
         for doc in sorted(grouped, key=str.casefold)
     ]
     return render_template(
@@ -390,6 +403,21 @@ def upload():
     uploaded.save(target)
     flash(f"PDF subido: {target.name}", "success")
     return redirect(url_for("document", name=stem))
+
+
+@app.post("/docs/<name>/delete")
+def delete_document(name):
+    stem = _safe_stem(name)
+    path = _pdf_path(stem)
+    if not path.is_file():
+        abort(404)
+    if _document_has_running_job(stem):
+        flash("No se puede borrar un documento mientras se está procesando.", "error")
+        return redirect(url_for("document", name=stem))
+
+    path.unlink()
+    flash("Documento eliminado. Los resultados anteriores se conservaron.", "success")
+    return redirect(url_for("index"))
 
 
 @app.get("/docs/<name>")
@@ -557,6 +585,29 @@ def job_stream(job_id):
         mimetype="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@app.post("/output/<name>/delete")
+def delete_output(name):
+    output_name = _safe_output_name(name)
+    path = OUTPUT_DIR / f"{output_name}.md"
+    if not path.is_file():
+        abort(404)
+
+    result = next(
+        (item for item in list_results() if item["name"] == output_name), None
+    )
+    path.unlink()
+    _result_meta_path(path).unlink(missing_ok=True)
+    flash("Resultado eliminado.", "success")
+
+    if request.form.get("back") == "document" and result and result.get("doc"):
+        document_name = secure_filename(str(result["doc"]))
+        if document_name.lower().endswith(".pdf"):
+            document_name = document_name[:-4]
+        if document_name and _pdf_path(document_name).is_file():
+            return redirect(url_for("document", name=document_name))
+    return redirect(url_for("index"))
 
 
 @app.get("/output/<name>/raw")
