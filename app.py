@@ -23,3 +23,15 @@ def save_config(config: dict) -> None:
         except FileNotFoundError:
             pass
         raise
+
+
+def get_active_provider(config: dict) -> dict:
+    try:
+        active = config["active"]
+    except KeyError as exc:
+        raise KeyError("Configuration is missing the active provider") from exc
+
+    try:
+        return config[active]
+    except KeyError as exc:
+        raise KeyError(f"Configuration has no provider named {active!r}") from exc

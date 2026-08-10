@@ -1,7 +1,15 @@
 {
+    "active": "openrouter",
     "openrouter": {
+        "api-url": "https://openrouter.ai/api/v1",
+        "api-key": "",
         "model": "qwen/qwen3-vl-235b-a22b-instruct",
-        "api-url": "https://openrouter.ai/api/v1/chat/completions",
-        "api-key": ""
+        "reasoning": "low"
+    },
+    "opencode": {
+        "api-url": "https://opencode.ai/zen/go/v1",
+        "api-key": "",
+        "model": "",
+        "reasoning": "low"
     }
 }
