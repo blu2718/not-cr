@@ -1,32 +1,15 @@
-import os
-import shutil
+from pathlib import Path
 
 from pdf2image import convert_from_path
 
 
-def create_img_dir():
-    shutil.rmtree("img/")
-    directory_name = "img"
-    try:
-        os.mkdir(directory_name)
-    except PermissionError:
-        print(f"Permission denied: Unable to create '{directory_name}'.")
-    except Exception as e:
-        print(f"An error occurred: {e}")
-    open(os.path.join("img", ".gitkeep"), "w")
-
-
-def convert(pdf_file):
-    print("├ Creando directorio")
-
-    create_img_dir()
-
-    print("└ Convirtiendo")
-
+def convert(pdf_file: str, output_dir: str) -> None:
+    directory = Path(output_dir)
+    directory.mkdir(parents=True, exist_ok=True)
     convert_from_path(
         pdf_file,
-        output_folder="img/",
+        output_folder=str(directory),
         fmt="jpeg",
         jpegopt={"quality": 70, "optimize": True, "progressive": False},
-        output_file=pdf_file.removesuffix(".pdf").removeprefix("docs/"),
+        output_file=Path(pdf_file).stem,
     )
