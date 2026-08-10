@@ -1,5 +1,18 @@
 {% extends "base.html" %}
 {% block title %}{{ output_name }} · not-cr{% endblock %}
+{% block head %}
+<script>
+    window.MathJax = {
+        tex: {
+            inlineMath: [["\\(", "\\)"], ["$", "$"]],
+            displayMath: [["\\[", "\\]"], ["$$", "$$"]],
+            processEscapes: true
+        },
+        options: { skipHtmlTags: ["script", "noscript", "style", "textarea", "pre", "code"] }
+    };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+{% endblock %}
 {% block content %}
 <div class="page-heading">
     <div>
