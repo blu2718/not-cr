@@ -6,6 +6,7 @@
     const check = document.querySelector("#job-check");
     const clock = document.querySelector("#job-clock");
     const step = document.querySelector("#job-step");
+    const progress = document.querySelector("#job-progress");
     const fill = document.querySelector("#progress-fill");
     const live = document.querySelector("#live-text");
     const log = document.querySelector("#job-log");
@@ -74,7 +75,10 @@
         if (value.step === "batch") {
             if (value.index === 0) step.textContent = `${value.total} lotes preparados`;
             else step.textContent = `Lote ${value.index}/${value.total}`;
-            if (value.total) fill.style.width = `${Math.round((value.index / value.total) * 100)}%`;
+            if (value.total && value.index > 0) {
+                progress.hidden = false;
+                fill.style.width = `${Math.round((value.index / value.total) * 100)}%`;
+            }
         }
         if (value.step === "saving") step.textContent = "Guardando a Markdown";
     });
