@@ -59,7 +59,10 @@ def process_pdf(
         if usage is not None:
             emit("usage", usage)
 
-        content = response["choices"][0]["message"]["content"]
+        message_content = response["choices"][0].get("message", {}).get("content")
+        if not message_content:
+            raise ValueError("El modelo no devolvió contenido de texto.")
+        content = message_content
         cleaned = processing_text.clean_markdown(content)
         if index == 1:
             piece = cleaned

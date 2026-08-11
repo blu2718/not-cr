@@ -12,6 +12,80 @@ BATCH_SIZE = 20
 DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
 
 
+def _is_opencode(base_url: str) -> bool:
+    return "opencode.ai" in base_url.lower()
+
+
+def _uses_responses_api(base_url: str, model: str) -> bool:
+    if not _is_opencode(base_url):
+        return False
+    model_id = model.lower()
+    if "/go/" in base_url.lower():
+        return model_id.startswith("gpt-")
+    return model_id.startswith(("gpt-", "grok-"))
+
+
+def _responses_input(message: list[dict]) -> list[dict]:
+    converted = []
+    for item in message:
+        content = item.get("content", "")
+        if isinstance(content, str):
+            content = [{"type": "input_text", "text": content}]
+        else:
+            parts = []
+            for part in content:
+                if part.get("type") == "text":
+                    parts.append({"type": "input_text", "text": part.get("text", "")})
+                elif part.get("type") == "image_url":
+                    image_url = part.get("image_url", {}).get("url")
+                    if image_url:
+                        parts.append({"type": "input_image", "image_url": image_url})
+            content = parts
+        converted.append({"role": item.get("role", "user"), "content": content})
+    return converted
+
+
+def _responses_to_chat(completion) -> dict:
+    raw = completion.model_dump()
+    text = getattr(completion, "output_text", None)
+    if not text:
+        text_parts = []
+        for output in raw.get("output", []):
+            for part in output.get("content", []):
+                if part.get("type") == "output_text" and part.get("text"):
+                    text_parts.append(part["text"])
+        text = "".join(text_parts)
+    if not text:
+        raise ValueError("El modelo no devolvió contenido de texto.")
+
+    usage = raw.get("usage")
+    if usage:
+        usage = dict(usage)
+        if "input_tokens" in usage:
+            usage.setdefault("prompt_tokens", usage["input_tokens"])
+        if "output_tokens" in usage:
+            usage.setdefault("completion_tokens", usage["output_tokens"])
+        if "total_tokens" not in usage and "prompt_tokens" in usage and "completion_tokens" in usage:
+            usage["total_tokens"] = usage["prompt_tokens"] + usage["completion_tokens"]
+
+    response = {
+        "id": raw.get("id"),
+        "object": "chat.completion",
+        "created": raw.get("created"),
+        "model": raw.get("model"),
+        "choices": [
+            {
+                "index": 0,
+                "message": {"role": "assistant", "content": text},
+                "finish_reason": "stop",
+            }
+        ],
+    }
+    if usage:
+        response["usage"] = usage
+    return response
+
+
 def encode_image_to_base64(image_path: str | Path) -> str:
     return base64.b64encode(Path(image_path).read_bytes()).decode("utf-8")
 
@@ -55,12 +129,26 @@ def to_model(
     write_output=False,
 ) -> dict:
     client = OpenAI(api_key=api_key, base_url=base_url)
-    request = {"model": model, "messages": message}
-    if reasoning:
-        request["extra_body"] = {"reasoning": {"effort": reasoning}}
 
-    completion = client.chat.completions.create(**request)
-    response = completion.model_dump()
+    if _uses_responses_api(base_url, model):
+        request = {"model": model, "input": _responses_input(message)}
+        if reasoning:
+            request["reasoning"] = {"effort": reasoning}
+        try:
+            completion = client.responses.create(**request)
+        except Exception as exc:
+            if not reasoning or "reasoning" not in str(exc).lower():
+                raise
+            request.pop("reasoning", None)
+            completion = client.responses.create(**request)
+        response = _responses_to_chat(completion)
+    else:
+        request = {"model": model, "messages": message}
+        # OpenCode's chat-compatible models reject the OpenRouter-only field.
+        if reasoning and not _is_opencode(base_url):
+            request["extra_body"] = {"reasoning": {"effort": reasoning}}
+        completion = client.chat.completions.create(**request)
+        response = completion.model_dump()
 
     if write_output:
         Path("output.json").write_text(
