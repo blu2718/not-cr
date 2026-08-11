@@ -17,6 +17,8 @@
         let loaded = false;
         let failed = false;
         let focused = false;
+        let selectedReasoningModel = null;
+        const fallbackReasoningEfforts = ["low", "medium", "high"];
 
         const formatPrice = (value) => {
             const number = Number(value);
@@ -45,6 +47,40 @@
             return models.find((model) => modelId(model) === hidden.value || modelId(model) === input.value);
         }
 
+        function appendReasoningOption(value, label) {
+            const option = document.createElement("option");
+            option.value = value;
+            option.textContent = label;
+            reasoning.append(option);
+        }
+
+        function updateReasoningOptions(model, reset) {
+            if (!reasoning) return;
+
+            const previous = reasoning.value;
+            const efforts = Array.isArray(model.reasoning_efforts)
+                ? model.reasoning_efforts
+                    .map((effort) => String(effort).toLowerCase())
+                    .filter((effort, index, values) => effort && effort !== "none" && values.indexOf(effort) === index)
+                : fallbackReasoningEfforts;
+            const mandatory = model.reasoning_mandatory === true;
+            const defaultEffort = String(model.reasoning_default_effort || "").toLowerCase();
+
+            reasoning.replaceChildren();
+            appendReasoningOption(
+                "",
+                defaultEffort === "none"
+                    ? "Por defecto del proveedor (no enviar)"
+                    : `Por defecto del proveedor${defaultEffort ? ` (${defaultEffort})` : ""}`
+            );
+            efforts.forEach((effort) => appendReasoningOption(effort, effort));
+            if (!mandatory) appendReasoningOption("off", "No enviar");
+
+            const validValues = new Set(["", ...efforts]);
+            if (!mandatory) validValues.add("off");
+            reasoning.value = !reset && validValues.has(previous) ? previous : "";
+        }
+
         function updateMetadata() {
             if (!meta) return;
             const model = selectedModel();
@@ -52,7 +88,15 @@
                 meta.textContent = "";
                 if (reasoning) reasoning.disabled = false;
                 if (reasoningNote) reasoningNote.textContent = "";
+                selectedReasoningModel = null;
                 return;
+            }
+
+            const modelChanged = selectedReasoningModel !== null
+                && selectedReasoningModel !== modelId(model);
+            if (selectedReasoningModel !== modelId(model)) {
+                updateReasoningOptions(model, modelChanged);
+                selectedReasoningModel = modelId(model);
             }
 
             const details = [];
@@ -74,7 +118,11 @@
                 if (reasoningNote) reasoningNote.textContent = "Este modelo no admite razonamiento.";
             } else {
                 reasoning.disabled = false;
-                if (reasoningNote) reasoningNote.textContent = "";
+                if (reasoningNote) {
+                    reasoningNote.textContent = model.reasoning_mandatory === true
+                        ? "Este modelo exige razonamiento."
+                        : "";
+                }
             }
         }
 
