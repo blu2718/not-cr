@@ -9,6 +9,19 @@ CACHE_TTL = 5 * 60
 MODEL_CACHE: dict[str, tuple[float, list[dict]]] = {}
 
 
+def _is_opencode(base_url: str) -> bool:
+    return "opencode.ai" in base_url.lower()
+
+
+def _uses_responses_api(base_url: str, model_id: str) -> bool:
+    if not _is_opencode(base_url):
+        return False
+    model_id = model_id.lower()
+    if "/go/" in base_url.lower():
+        return model_id.startswith("gpt-")
+    return model_id.startswith(("gpt-", "grok-"))
+
+
 def list_models(api_key: str, base_url: str) -> list[dict]:
     now = time.monotonic()
     cached = MODEL_CACHE.get(base_url)
@@ -58,6 +71,14 @@ def list_models(api_key: str, base_url: str) -> list[dict]:
             item["supports_reasoning"] = "reasoning" in supported
         elif isinstance(reasoning, dict):
             item["supports_reasoning"] = True
+
+        if _is_opencode(base_url):
+            if _uses_responses_api(base_url, model_id):
+                item["supports_reasoning"] = True
+            else:
+                item["supports_reasoning"] = False
+                item["reasoning_efforts"] = []
+                item["reasoning_mandatory"] = False
 
         normalized.append(item)
 
