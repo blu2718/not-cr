@@ -37,7 +37,7 @@ Cada corrida crea un Markdown nuevo en `output/` y su sidecar `.meta.json`; repr
 
 ## Proveedores
 
-Se soportan OpenRouter y OpenCode Zen. Ambos se consultan con la librería oficial `openai`, cambiando `base_url`, y usan el formato estándar `chat/completions`. En Zen solo funcionan los modelos publicados bajo `/chat/completions`; los precios, el contexto y `supported_parameters` dependen de los metadatos que cada proveedor publique en `/models`.
+Se soportan OpenRouter y OpenCode Zen/Go. Ambos se consultan con la librería oficial `openai`, cambiando `base_url`. OpenRouter usa `chat/completions`; en OpenCode los modelos GPT usan `responses` y los modelos compatibles usan `chat/completions`. Los precios, el contexto y las capacidades dependen de los metadatos que cada proveedor publique en `/models`.
 
 ## Tests
 
