@@ -65,6 +65,7 @@
                 : fallbackReasoningEfforts;
             const mandatory = model.reasoning_mandatory === true;
             const defaultEffort = String(model.reasoning_default_effort || "").toLowerCase();
+            const providerToggle = model.reasoning_mode === "toggle";
 
             reasoning.replaceChildren();
             appendReasoningOption(
@@ -73,11 +74,13 @@
                     ? "Por defecto del proveedor (no enviar)"
                     : `Por defecto del proveedor${defaultEffort ? ` (${defaultEffort})` : ""}`
             );
-            efforts.forEach((effort) => appendReasoningOption(effort, effort));
-            if (!mandatory) appendReasoningOption("off", "No enviar");
+            if (!providerToggle) {
+                efforts.forEach((effort) => appendReasoningOption(effort, effort));
+                if (!mandatory) appendReasoningOption("off", "No enviar");
+            }
 
             const validValues = new Set(["", ...efforts]);
-            if (!mandatory) validValues.add("off");
+            if (!mandatory && !providerToggle) validValues.add("off");
             reasoning.value = !reset && validValues.has(previous) ? previous : "";
         }
 
@@ -116,6 +119,10 @@
                 reasoning.disabled = true;
                 reasoning.value = "";
                 if (reasoningNote) reasoningNote.textContent = "Este modelo no admite razonamiento.";
+            } else if (model.reasoning_mode === "toggle") {
+                reasoning.disabled = true;
+                reasoning.value = "";
+                if (reasoningNote) reasoningNote.textContent = "Este modelo usa el razonamiento del proveedor y no admite niveles explícitos.";
             } else {
                 reasoning.disabled = false;
                 if (reasoningNote) {

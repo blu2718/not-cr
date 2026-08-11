@@ -39,6 +39,8 @@ Cada corrida crea un Markdown nuevo en `output/` y su sidecar `.meta.json`; repr
 
 Se soportan OpenRouter y OpenCode Zen/Go. Ambos se consultan con la librería oficial `openai`, cambiando `base_url`. OpenRouter usa `chat/completions`; en OpenCode los modelos GPT usan `responses` y los modelos compatibles usan `chat/completions`. Los precios, el contexto y las capacidades dependen de los metadatos que cada proveedor publique en `/models`.
 
+Los niveles de razonamiento de OpenCode dependen del modelo: GPT usa `reasoning` en Responses, los modelos OpenAI-compatible que lo admiten usan `reasoning_effort`, y modelos como MiMo/Kimi pueden exponer solo el razonamiento por defecto del proveedor, sin niveles explícitos.
+
 ## Tests
 
 ```bash

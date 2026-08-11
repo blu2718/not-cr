@@ -25,6 +25,18 @@ def _uses_responses_api(base_url: str, model: str) -> bool:
     return model_id.startswith(("gpt-", "grok-"))
 
 
+def _opencode_chat_supports_effort(model: str) -> bool:
+    model_id = model.lower().rsplit("/", 1)[-1]
+    if model_id.startswith("grok-3-mini"):
+        return True
+    if any(
+        family in model_id
+        for family in ("deepseek", "minimax", "mimo", "kimi", "qwen", "big-pickle", "glm")
+    ):
+        return "glm-5.2" in model_id or "glm-5-2" in model_id or "glm-5p2" in model_id
+    return True
+
+
 def _responses_input(message: list[dict]) -> list[dict]:
     converted = []
     for item in message:
@@ -144,10 +156,21 @@ def to_model(
         response = _responses_to_chat(completion)
     else:
         request = {"model": model, "messages": message}
-        # OpenCode's chat-compatible models reject the OpenRouter-only field.
-        if reasoning and not _is_opencode(base_url):
+        if reasoning and _is_opencode(base_url):
+            if _opencode_chat_supports_effort(model):
+                request["reasoning_effort"] = reasoning
+        elif reasoning:
             request["extra_body"] = {"reasoning": {"effort": reasoning}}
-        completion = client.chat.completions.create(**request)
+        try:
+            completion = client.chat.completions.create(**request)
+        except Exception as exc:
+            message_text = str(exc).lower()
+            if not reasoning or not _is_opencode(base_url) or not any(
+                marker in message_text for marker in ("reasoning", "reasoning_effort", "extra inputs")
+            ):
+                raise
+            request.pop("reasoning_effort", None)
+            completion = client.chat.completions.create(**request)
         response = completion.model_dump()
 
     if write_output:

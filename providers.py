@@ -5,6 +5,8 @@ from openai import OpenAI
 
 
 REASONING_EFFORTS = ["low", "medium", "high", "minimal", "xhigh", "max"]
+OPENCODE_CHAT_EFFORTS = ["minimal", "low", "medium", "high", "xhigh"]
+OPENCODE_RESPONSES_EFFORTS = ["low", "medium", "high", "xhigh"]
 CACHE_TTL = 5 * 60
 MODEL_CACHE: dict[str, tuple[float, list[dict]]] = {}
 
@@ -20,6 +22,25 @@ def _uses_responses_api(base_url: str, model_id: str) -> bool:
     if "/go/" in base_url.lower():
         return model_id.startswith("gpt-")
     return model_id.startswith(("gpt-", "grok-"))
+
+
+def _opencode_reasoning_efforts(base_url: str, model_id: str) -> list[str]:
+    # OpenCode's public /models response omits models.dev reasoning_options;
+    # mirror the provider transform's model-family rules for the common IDs.
+    if _uses_responses_api(base_url, model_id):
+        return OPENCODE_RESPONSES_EFFORTS.copy()
+
+    normalized_id = model_id.lower().rsplit("/", 1)[-1]
+    if normalized_id.startswith("grok-3-mini"):
+        return ["low", "high"]
+    if "glm-5.2" in normalized_id or "glm-5-2" in normalized_id or "glm-5p2" in normalized_id:
+        return ["high", "max"]
+    if any(
+        family in normalized_id
+        for family in ("deepseek", "minimax", "mimo", "kimi", "qwen", "big-pickle", "glm")
+    ):
+        return []
+    return OPENCODE_CHAT_EFFORTS.copy()
 
 
 def list_models(api_key: str, base_url: str) -> list[dict]:
@@ -66,6 +87,29 @@ def list_models(api_key: str, base_url: str) -> list[dict]:
             if default_effort:
                 item["reasoning_default_effort"] = str(default_effort).lower()
 
+        reasoning_options = raw.get("reasoning_options")
+        if isinstance(reasoning_options, list):
+            effort_option = next(
+                (option for option in reasoning_options if isinstance(option, dict) and option.get("type") == "effort"),
+                None,
+            )
+            if effort_option is not None:
+                values = effort_option.get("values") or []
+                item["reasoning_mode"] = "effort"
+                item["reasoning_efforts"] = list(
+                    dict.fromkeys(
+                        str(effort).lower()
+                        for effort in values
+                        if effort and str(effort).lower() != "none"
+                    )
+                )
+            elif any(
+                isinstance(option, dict) and option.get("type") == "toggle"
+                for option in reasoning_options
+            ):
+                item["reasoning_mode"] = "toggle"
+                item["reasoning_efforts"] = []
+
         if "supported_parameters" in raw:
             supported = raw["supported_parameters"] or []
             item["supports_reasoning"] = "reasoning" in supported
@@ -73,12 +117,17 @@ def list_models(api_key: str, base_url: str) -> list[dict]:
             item["supports_reasoning"] = True
 
         if _is_opencode(base_url):
-            if _uses_responses_api(base_url, model_id):
+            if isinstance(reasoning_options, list):
+                item["supports_reasoning"] = bool(reasoning) or item.get("reasoning_mode") in {"effort", "toggle"}
+            elif _uses_responses_api(base_url, model_id):
                 item["supports_reasoning"] = True
+                item["reasoning_mode"] = "effort"
+                item["reasoning_efforts"] = _opencode_reasoning_efforts(base_url, model_id)
             else:
-                item["supports_reasoning"] = False
-                item["reasoning_efforts"] = []
-                item["reasoning_mandatory"] = False
+                efforts = _opencode_reasoning_efforts(base_url, model_id)
+                item["supports_reasoning"] = True
+                item["reasoning_mode"] = "toggle" if not efforts else "effort"
+                item["reasoning_efforts"] = efforts
 
         normalized.append(item)
 
