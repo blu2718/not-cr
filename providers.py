@@ -4,7 +4,7 @@ import time
 from openai import OpenAI
 
 
-REASONING_EFFORTS = ["low", "medium", "high"]
+REASONING_EFFORTS = ["low", "medium", "high", "minimal", "xhigh", "max"]
 CACHE_TTL = 5 * 60
 MODEL_CACHE: dict[str, tuple[float, list[dict]]] = {}
 
@@ -34,9 +34,30 @@ def list_models(api_key: str, base_url: str) -> list[dict]:
             except (TypeError, ValueError):
                 pass
 
+        reasoning = raw.get("reasoning")
+        item["reasoning_efforts"] = None
+        item["reasoning_mandatory"] = False
+        item["reasoning_default_effort"] = None
+        if isinstance(reasoning, dict):
+            supported_efforts = reasoning.get("supported_efforts")
+            if isinstance(supported_efforts, (list, tuple)):
+                item["reasoning_efforts"] = list(
+                    dict.fromkeys(
+                        str(effort).lower()
+                        for effort in supported_efforts
+                        if effort and str(effort).lower() != "none"
+                    )
+                )
+            item["reasoning_mandatory"] = bool(reasoning.get("mandatory", False))
+            default_effort = reasoning.get("default_effort")
+            if default_effort:
+                item["reasoning_default_effort"] = str(default_effort).lower()
+
         if "supported_parameters" in raw:
             supported = raw["supported_parameters"] or []
             item["supports_reasoning"] = "reasoning" in supported
+        elif isinstance(reasoning, dict):
+            item["supports_reasoning"] = True
 
         normalized.append(item)
 
