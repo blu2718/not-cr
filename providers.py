@@ -16,7 +16,7 @@ def _is_opencode(base_url: str) -> bool:
 def _uses_responses_api(base_url: str, model_id: str) -> bool:
     if not _is_opencode(base_url):
         return False
-    model_id = model_id.lower()
+    model_id = model_id.lower().rsplit("/", 1)[-1]
     if "/go/" in base_url.lower():
         return model_id.startswith("gpt-")
     return model_id.startswith(("gpt-", "grok-"))
