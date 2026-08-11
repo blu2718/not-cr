@@ -52,17 +52,18 @@ button { cursor: pointer; }
 code, .brand, .tag, .clock, .log, .live-text, .option-id { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
 
 .site-header { background: var(--surface); border-bottom: 1px solid var(--border); }
-.header-inner { max-width: 1100px; margin: 0 auto; padding: .9rem 1rem; display: flex; align-items: center; justify-content: space-between; }
+.header-inner { max-width: 1100px; margin: 0 auto; padding: .9rem 1rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .brand { color: var(--text); font-size: 1.05rem; font-weight: 800; letter-spacing: -.04em; }
 .brand:hover { text-decoration: none; }
-nav { display: flex; gap: 1.25rem; }
-nav a { color: var(--muted); font-size: .9rem; }
+nav { display: flex; align-items: center; flex-wrap: wrap; gap: 1.25rem; }
+nav a { display: inline-flex; align-items: center; min-height: 1.9rem; color: var(--muted); font-size: .9rem; line-height: 1.2; }
 nav a:hover { color: var(--text); }
-.theme-toggle { padding: .28rem .55rem; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--muted); font-size: .78rem; }
+.theme-toggle { display: inline-flex; align-items: center; justify-content: center; min-height: 1.9rem; padding: .28rem .55rem; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--muted); font-size: .78rem; line-height: 1.2; }
 .theme-toggle:hover { border-color: var(--accent); color: var(--text); }
 .container { max-width: 1100px; margin: 0 auto; padding: 2rem 1rem 4rem; }
-.hero-row, .page-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 1.5rem; margin-bottom: 1.25rem; }
+.hero-row, .page-heading { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 1.5rem; margin-bottom: 1.25rem; }
 .hero-row { align-items: center; padding: 1rem 0 .5rem; }
+.hero-row > div:first-child, .page-heading > div:first-child { min-width: 0; flex: 1 1 300px; }
 h1, h2, h3, p { margin-top: 0; }
 h1 { margin-bottom: .45rem; font-size: clamp(1.65rem, 3vw, 2.25rem); letter-spacing: -.04em; }
 h2 { margin-bottom: 0; font-size: 1rem; letter-spacing: -.01em; }
@@ -89,7 +90,7 @@ h3 { margin-bottom: .6rem; font-size: .95rem; }
 .page-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: .6rem; }
 .delete-form { margin: 0; }
 .inline-form { display: flex; align-items: center; gap: .6rem; }
-.upload-form { min-width: min(100%, 430px); }
+.upload-form { min-width: min(100%, 360px); flex: 1 1 360px; }
 .upload-form label, .field label { display: block; margin-bottom: .35rem; color: var(--muted); font-size: .78rem; font-weight: 700; }
 input[type=file] { width: 100%; padding: .35rem; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--muted); }
 input[type=text], input[type=url], input[type=password], select { width: 100%; min-height: 2.4rem; padding: .48rem .65rem; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); }
@@ -177,15 +178,20 @@ tr:hover td { background: var(--surface-subtle); }
 @media (max-width: 900px) {
     .two-column { grid-template-columns: 1fr; }
     .preview-card { margin-bottom: 0; }
+    .hero-row { align-items: flex-start; }
+    .result-row { align-items: flex-start; flex-wrap: wrap; }
+    .result-date { margin-left: 0; }
+    .pdf-preview { height: 60vh; min-height: 420px; }
 }
 @media (max-width: 620px) {
+    .header-inner { align-items: flex-start; flex-wrap: wrap; gap: .6rem; }
+    .header-inner nav { width: 100%; justify-content: flex-start; gap: .7rem; }
     .container { padding-top: 1.25rem; }
     .hero-row, .page-heading { display: block; }
     .hero-row .upload-form, .page-heading .page-actions { margin-top: 1rem; }
     .inline-form { display: grid; grid-template-columns: 1fr auto; }
     .result-list { --result-list-padding: .75rem; margin-left: .5rem; }
-    .result-row { align-items: flex-start; flex-wrap: wrap; padding-left: .55rem; }
-    .result-date { margin-left: 0; }
+    .result-row { padding-left: .55rem; }
     .pdf-preview { min-height: 360px; height: 60vh; }
     .form-grid, .provider-radios { grid-template-columns: 1fr; }
     .field--wide { grid-column: auto; }
