@@ -243,6 +243,20 @@ def _model_pricing(provider: dict, model: str) -> dict | None:
     return None
 
 
+def _model_reasoning_efforts(provider: dict, model: str) -> set[str] | None:
+    base_url = provider.get("api-url", "")
+    cached = providers.MODEL_CACHE.get(base_url)
+    if cached is None or time.monotonic() - cached[0] >= providers.CACHE_TTL:
+        return None
+    for entry in cached[1]:
+        if entry.get("id") == model:
+            efforts = entry.get("reasoning_efforts")
+            if isinstance(efforts, list):
+                return set(efforts)
+            return None
+    return None
+
+
 def _estimated_cost(usage: list[dict], pricing: dict | None) -> float | None:
     if not usage or not isinstance(pricing, dict):
         return None
@@ -489,13 +503,16 @@ def process(name):
     if not model:
         return "No hay un modelo seleccionado.", 400
 
+    metadata_efforts = _model_reasoning_efforts(provider, model)
+    allowed_efforts = metadata_efforts if metadata_efforts is not None else set(providers.REASONING_EFFORTS)
     reasoning_selection = request.form.get("reasoning", "")
-    if reasoning_selection == "off":
+    if reasoning_selection in {"off", "none"}:
         reasoning = None
-    elif reasoning_selection in providers.REASONING_EFFORTS:
+    elif reasoning_selection in allowed_efforts:
         reasoning = reasoning_selection
     elif reasoning_selection == "":
-        reasoning = provider.get("reasoning") or None
+        configured_reasoning = provider.get("reasoning") or None
+        reasoning = None if configured_reasoning in {"off", "none"} else configured_reasoning
     else:
         return "Nivel de razonamiento no válido.", 400
 
