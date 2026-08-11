@@ -49,12 +49,14 @@
                     <label for="reasoning">Nivel de razonamiento</label>
                     <select id="reasoning" name="reasoning">
                         <option value="" selected>Por defecto del proveedor ({{ provider.get('reasoning') or 'no enviar' }})</option>
-                        <option value="low">low</option>
-                        <option value="medium">medium</option>
-                        <option value="high">high</option>
-                        <option value="minimal">minimal</option>
-                        <option value="xhigh">xhigh</option>
-                        <option value="max">max</option>
+                        {% if provider_name != 'opencode' %}
+                            <option value="low">low</option>
+                            <option value="medium">medium</option>
+                            <option value="high">high</option>
+                            <option value="minimal">minimal</option>
+                            <option value="xhigh">xhigh</option>
+                            <option value="max">max</option>
+                        {% endif %}
                         <option value="off">No enviar</option>
                     </select>
                     <p id="reasoning-note" class="field-note"></p>

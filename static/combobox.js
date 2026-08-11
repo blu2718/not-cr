@@ -199,7 +199,7 @@
             if (loaded || failed) return;
             loaded = true;
             try {
-                const response = await fetch(comboRoot.dataset.modelsUrl);
+                const response = await fetch(comboRoot.dataset.modelsUrl, { cache: "no-store" });
                 const data = await response.json();
                 if (!response.ok) throw new Error(data.error || "No se pudo cargar el catálogo.");
                 models = Array.isArray(data) ? data : [];

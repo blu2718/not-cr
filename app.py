@@ -250,6 +250,8 @@ def _model_reasoning_efforts(provider: dict, model: str) -> set[str] | None:
         return None
     for entry in cached[1]:
         if entry.get("id") == model:
+            if entry.get("supports_reasoning") is False:
+                return set()
             efforts = entry.get("reasoning_efforts")
             if isinstance(efforts, list):
                 return set(efforts)
@@ -473,7 +475,9 @@ def api_models():
         if not api_key:
             return jsonify({"error": "No hay API key configurada."}), 502
         models = providers.list_models(api_key, provider.get("api-url", ""))
-        return jsonify(models)
+        response = jsonify(models)
+        response.headers["Cache-Control"] = "no-store"
+        return response
     except Exception as exc:
         return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 502
 
@@ -506,7 +510,9 @@ def process(name):
     metadata_efforts = _model_reasoning_efforts(provider, model)
     allowed_efforts = metadata_efforts if metadata_efforts is not None else set(providers.REASONING_EFFORTS)
     reasoning_selection = request.form.get("reasoning", "")
-    if reasoning_selection in {"off", "none"}:
+    if metadata_efforts == set():
+        reasoning = None
+    elif reasoning_selection in {"off", "none"}:
         reasoning = None
     elif reasoning_selection in allowed_efforts:
         reasoning = reasoning_selection
