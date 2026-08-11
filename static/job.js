@@ -18,6 +18,7 @@
     let finished = false;
 
     function parse(event) {
+        if (event.data === undefined) return null;
         try {
             return JSON.parse(event.data);
         } catch (_error) {
@@ -98,6 +99,8 @@
         source.close();
     });
     source.addEventListener("error", (event) => {
+        // EventSource also emits native error events without an SSE payload.
+        if (event.data === undefined) return;
         const value = parse(event);
         finish();
         indicator.hidden = true;

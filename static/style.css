@@ -44,6 +44,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { margin: 0; min-width: 320px; background: var(--bg); font-size: 15px; }
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
