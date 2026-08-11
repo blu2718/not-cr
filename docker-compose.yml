@@ -1,0 +1,13 @@
+services:
+  not-cr:
+    build:
+      context: .
+    init: true
+    ports:
+      - "${NOT_CR_PORT:-5000}:5000"
+    volumes:
+      - not-cr-data:/data
+    restart: unless-stopped
+
+volumes:
+  not-cr-data:

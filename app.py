@@ -29,9 +29,9 @@ import processing_images
 import providers
 
 
-CONFIG_PATH = Path("config.json")
-DOCS_DIR = Path("docs")
-OUTPUT_DIR = Path("output")
+CONFIG_PATH = Path(os.environ.get("NOT_CR_CONFIG_PATH", "config.json"))
+DOCS_DIR = Path(os.environ.get("NOT_CR_DOCS_DIR", "docs"))
+OUTPUT_DIR = Path(os.environ.get("NOT_CR_OUTPUT_DIR", "output"))
 
 DEFAULT_PROVIDERS = {
     "openrouter": {

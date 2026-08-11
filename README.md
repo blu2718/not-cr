@@ -17,6 +17,30 @@ cp config.example.json config.json
 
 Edita `config.json` con la API key, la URL base y los valores por defecto de cada proveedor, o configura todo desde la página `/config` de la aplicación. `config.json` no forma parte del repositorio.
 
+## Docker Compose
+
+La aplicación puede ejecutarse de forma autocontenida con Docker Compose. El
+primer arranque crea `config.json` desde `config.example.json`; la configuración,
+los PDFs y los resultados quedan persistidos en el volumen `not-cr-data`.
+
+```bash
+docker compose up --build -d
+```
+
+Abre `http://localhost:5000` y configura las API keys desde `/config`. Para usar
+otro puerto, define `NOT_CR_PORT`:
+
+```bash
+NOT_CR_PORT=8080 docker compose up --build -d
+```
+
+El servicio usa un worker Gunicorn con varios hilos porque los jobs y el estado
+SSE viven en memoria. Para detenerlo sin borrar los datos:
+
+```bash
+docker compose down
+```
+
 ## Uso
 
 Inicia la webapp:

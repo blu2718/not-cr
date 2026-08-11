@@ -1,0 +1,13 @@
+.git/
+.venv/
+__pycache__/
+*.py[cod]
+
+config.json
+docs/
+img/
+output/
+tests/
+PLAN.md
+
+*.meta.json
