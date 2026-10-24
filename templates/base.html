@@ -1,0 +1,149 @@
+{% from "_macros.html" import icon, progress %}
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}not-cr{% endblock %} · not-cr</title>
+  <script>
+    (function () {
+      var root = document.documentElement;
+      root.classList.add("js");
+      try {
+        var theme = localStorage.getItem("not-cr-theme");
+        if (theme === "light" || theme === "dark") root.dataset.theme = theme;
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="preload" href="{{ url_for('static', filename='fonts/Inter-Variable.woff2') }}" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 2h9l5 5v15H6z' fill='%235b5bd6'/%3E%3Cpath d='M4 13h18' stroke='%23fff' stroke-width='2'/%3E%3C/svg%3E">
+  {% block head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+
+{% macro sidebar(current) %}
+  <a class="brand" href="{{ url_for('index') }}" aria-label="not-cr, inicio">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6 2.5h8.5L19 7v14.5H6z" fill="var(--surface)" stroke="var(--text)" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M14.5 2.5V7H19" fill="none" stroke="var(--text)" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M8.5 11h6M8.5 17h7" stroke="var(--muted)" stroke-width="1.5" stroke-linecap="round"/>
+      <path d="M3 14h18" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    not-cr
+  </a>
+
+  <nav class="nav" aria-label="Principal">
+    <a class="nav__link" href="{{ url_for('index') }}#documentos" {% if current == 'docs' %}aria-current="page"{% endif %}>{{ icon('file-text') }}<span>Documentos</span></a>
+    <a class="nav__link" href="{{ url_for('index') }}#resultados">{{ icon('list') }}<span>Resultados</span></a>
+    <a class="nav__link" href="{{ url_for('index') }}#en-curso" data-nav-live {% if not sidebar_active %}hidden{% endif %}>
+      <span class="spinner" aria-hidden="true"></span><span>En curso</span><span class="count" data-nav-live-count>{{ sidebar_active }}</span>
+    </a>
+    <div class="nav__live" data-nav-live {% if not sidebar_active %}hidden{% endif %}>
+      {{ progress(sidebar_percent, mini=True, attrs='data-nav-live-bar') }}
+    </div>
+  </nav>
+
+  <nav class="nav" aria-label="Carpetas">
+    <div class="nav__title"><span>Carpetas</span></div>
+    <div class="nav__folders">
+      {% for name, count in sidebar_folders %}
+        <a class="nav__link" href="{{ url_for('index', folder=name) }}#resultados" title="{{ name }}">{{ icon('folder') }}<span>{{ name }}</span><span class="count">{{ count }}</span></a>
+      {% endfor %}
+      <a class="nav__link" href="{{ url_for('index', folder=no_folder) }}#resultados">{{ icon('folder') }}<span class="muted">Sin carpeta</span></a>
+    </div>
+    <button type="button" class="nav__link nav__link--add js-only" data-dialog-open="folder-dialog">{{ icon('plus') }}<span>Nueva carpeta</span></button>
+    <details class="nojs-only">
+      <summary class="nav__link nav__link--add">{{ icon('plus') }} Nueva carpeta</summary>
+      <form method="post" action="{{ url_for('folder_create') }}" class="nav__form">
+        <input class="input" name="name" maxlength="60" required aria-label="Nombre de la carpeta">
+        <input type="hidden" name="next" value="{{ request.full_path }}">
+        <button class="btn">Crear</button>
+      </form>
+    </details>
+  </nav>
+
+  <div class="sidebar__foot">
+    <nav class="nav" aria-label="Ajustes">
+      <a class="nav__link" href="{{ url_for('config_page') }}" {% if current == 'config' %}aria-current="page"{% endif %}>{{ icon('settings') }}<span>Configuración</span></a>
+    </nav>
+    <div class="seg seg--icons theme-switch js-only" role="group" aria-label="Tema">
+      <button type="button" data-theme-set="system" aria-label="Tema del sistema" title="Sistema">{{ icon('monitor') }}</button>
+      <button type="button" data-theme-set="light" aria-label="Tema claro" title="Claro">{{ icon('sun') }}</button>
+      <button type="button" data-theme-set="dark" aria-label="Tema oscuro" title="Oscuro">{{ icon('moon') }}</button>
+    </div>
+    <p class="shortcuts js-only"><kbd>/</kbd> buscar · <kbd>u</kbd> subir · <kbd>Esc</kbd> limpiar</p>
+  </div>
+{% endmacro %}
+
+<div class="app">
+  <aside class="sidebar">{{ sidebar(nav_current|default('')) }}</aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button type="button" class="btn btn--ghost btn--icon js-only" data-dialog-open="menu-panel" aria-label="Abrir menú">{{ icon('menu', 20) }}</button>
+      <a class="brand" href="{{ url_for('index') }}">not-cr</a>
+      <a class="btn btn--ghost btn--icon nojs-only" href="{{ url_for('config_page') }}" aria-label="Configuración" style="margin-left:auto">{{ icon('settings') }}</a>
+    </header>
+
+    {% block before_content %}{% endblock %}
+    <main class="content {% block content_class %}{% endblock %}" id="contenido">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+
+<dialog class="menu-panel" id="menu-panel" aria-label="Menú">
+  <div class="sidebar">{{ sidebar(nav_current|default('')) }}</div>
+</dialog>
+
+{# Toasts: los flashes de Flask #}
+<div class="toasts" aria-live="polite" data-toasts>
+  {% for category, message in get_flashed_messages(with_categories=true) %}
+    <div class="toast toast--{{ 'error' if category == 'error' else 'success' }}" {% if category == 'error' %}role="alert"{% else %}role="status"{% endif %}>
+      {{ icon('circle-x' if category == 'error' else 'circle-check') }}
+      <div class="toast__text">{{ message }}</div>
+      <button type="button" class="btn btn--ghost btn--icon js-only" data-toast-close aria-label="Cerrar">{{ icon('x') }}</button>
+    </div>
+  {% endfor %}
+</div>
+
+{# Diálogo compartido de confirmación (formularios con data-confirm) #}
+<dialog class="dialog" id="confirm-dialog" aria-labelledby="confirm-title">
+  <div class="dialog__body">
+    <h2 id="confirm-title" data-confirm-title>¿Seguro?</h2>
+    <p data-confirm-text></p>
+    <div data-confirm-slot></div>
+  </div>
+  <div class="dialog__foot">
+    <button type="button" class="btn" data-dialog-close>Cancelar</button>
+    <button type="button" class="btn btn--danger" data-confirm-ok>Borrar</button>
+  </div>
+</dialog>
+
+{# Nueva carpeta #}
+<dialog class="dialog" id="folder-dialog" aria-labelledby="folder-dialog-title">
+  <form method="post" action="{{ url_for('folder_create') }}">
+    <div class="dialog__body">
+      <h2 id="folder-dialog-title">Nueva carpeta</h2>
+      <p>Las carpetas agrupan resultados. Un resultado está en una carpeta como mucho.</p>
+      <div class="field">
+        <label for="folder-name">Nombre</label>
+        <input class="input" id="folder-name" name="name" maxlength="60" required pattern="[^/]+" title="Sin «/»" autocomplete="off">
+      </div>
+      <input type="hidden" name="next" value="{{ request.full_path }}">
+    </div>
+    <div class="dialog__foot">
+      <button type="button" class="btn" data-dialog-close>Cancelar</button>
+      <button class="btn btn--primary">{{ icon('folder-plus') }} Crear carpeta</button>
+    </div>
+  </form>
+</dialog>
+
+{% block dialogs %}{% endblock %}
+
+<script src="{{ url_for('static', filename='theme.js') }}"></script>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

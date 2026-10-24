@@ -1,0 +1,176 @@
+{# Macros reutilizables de la interfaz. #}
+
+{% macro icon(name, size=16, label=None) -%}
+<svg class="icon{% if size == 20 %} icon--20{% endif %}" {% if label %}role="img" aria-label="{{ label }}"{% else %}aria-hidden="true"{% endif %}><use href="{{ url_for('static', filename='icons.svg') }}#i-{{ name }}"></use></svg>
+{%- endmacro %}
+
+{% macro model_tag(model) -%}
+{% if model -%}
+<span class="tag tag--model" style="--h: {{ model|model_hue }}" title="{{ model }}">{{ model|model_short }}</span>
+{%- else -%}
+<span class="tag" title="Resultado sin metadatos de modelo">sin etiqueta</span>
+{%- endif %}
+{%- endmacro %}
+
+{% macro progress(percent, mini=False, state='', label='Progreso', attrs='') -%}
+<div class="progress{% if mini %} progress--mini{% endif %}{% if state %} progress--{{ state }}{% endif %}" role="progressbar" aria-label="{{ label }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ percent }}" {{ attrs|safe }}>
+  <div class="progress__bar" style="width: {{ percent }}%"></div>
+</div>
+{%- endmacro %}
+
+{% macro thumb_url(name, version) -%}
+{{ url_for('doc_thumb', name=name) }}?v={{ version }}
+{%- endmacro %}
+
+{% macro job_state_text(job) -%}
+{%- if job.status == 'queued' -%}En cola
+{%- elif job.status == 'done' -%}✓ Listo
+{%- elif job.status == 'error' -%}✗ Error
+{%- elif job.step == 'page' and job.total -%}Página {{ job.index }} de {{ job.total }}
+{%- elif job.step == 'saving' -%}Guardando
+{%- else -%}Convirtiendo
+{%- endif -%}
+{%- endmacro %}
+
+{% macro job_card(job) -%}
+<a class="job-card" href="{{ job.url }}" data-job-card="{{ job.id }}">
+  <img class="job-card__thumb" src="{{ url_for('doc_thumb', name=job.doc) }}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
+  <span class="job-card__name" title="{{ job.doc }}">{{ job.doc }}</span>
+  <span class="job-card__meta">
+    {{ model_tag(job.model) }}
+    <span class="job-card__state{% if job.status in ('done', 'error') %} job-card__state--{{ job.status }}{% endif %}" data-job-state>{{ job_state_text(job) }}</span>
+  </span>
+  <span class="job-card__meta">
+    {{ progress(job.percent, mini=True, state=('done' if job.status == 'done' else 'error' if job.status == 'error' else ''), attrs='data-job-bar style="flex:1"') }}
+    <span class="num" data-job-eta>{% if job.eta_seconds %}≈ {{ job.eta_seconds|duration }}{% endif %}</span>
+  </span>
+</a>
+{%- endmacro %}
+
+{% macro empty(text, illustration=True) -%}
+<div class="empty">
+  {% if illustration %}
+  <svg class="illustration" viewBox="0 0 96 80" fill="none" aria-hidden="true">
+    <rect x="30" y="6" width="44" height="58" rx="4" fill="var(--surface)" stroke="currentColor" stroke-opacity=".35" transform="rotate(8 52 35)"/>
+    <rect x="22" y="12" width="44" height="58" rx="4" fill="var(--surface)" stroke="currentColor" stroke-opacity=".5"/>
+    <path d="M30 26h28M30 34h28M30 42h20M30 50h24" stroke="currentColor" stroke-opacity=".35" stroke-width="2" stroke-linecap="round"/>
+  </svg>
+  {% endif %}
+  <div>{{ caller() if caller else text }}</div>
+</div>
+{%- endmacro %}
+
+{# Formulario de borrado de documento con los dos modos. Sin JS: radios + checkbox obligatorio.
+   Con JS (app.js): el bloque [data-choices] se muestra en el diálogo de confirmación. #}
+{% macro delete_doc_form(name, results_count, button_class='btn btn--danger-ghost', label='Borrar…', next=None) -%}
+<form method="post" action="{{ url_for('doc_delete', name=name) }}" class="delete-doc-form"
+      data-confirm data-confirm-title="Borrar {{ name }}.pdf"
+      data-confirm-text="Elige qué borrar.">
+  <div class="nojs-only" data-choices>
+    <label class="choice">
+      <input type="radio" name="mode" value="pdf" checked data-button="Borrar solo el PDF">
+      <span><strong>Solo el PDF</strong><span>{% if results_count %}Se conservan sus {{ results_count }} resultado{{ 's' if results_count != 1 }}.{% else %}No tiene resultados.{% endif %}</span></span>
+    </label>
+    <label class="choice">
+      <input type="radio" name="mode" value="all" data-button="Borrar PDF{% if results_count %} y {{ results_count }} resultado{{ 's' if results_count != 1 }}{% endif %}">
+      <span><strong>PDF y resultados</strong><span>Se borran el PDF y {{ results_count }} resultado{{ 's' if results_count != 1 }}. No se puede deshacer.</span></span>
+    </label>
+    <label class="check confirm-box"><input type="checkbox" name="confirm" value="1" required> Confirmo el borrado</label>
+  </div>
+  <button class="{{ button_class }}">{{ icon('trash') }} {{ label }}</button>
+</form>
+{%- endmacro %}
+
+{% macro delete_result_form(name, next, compact=True) -%}
+<form method="post" action="{{ url_for('output_delete', name=name) }}" class="inline-form"
+      data-confirm data-confirm-title="Borrar resultado"
+      data-confirm-text="Se borran el Markdown y sus metadatos. No se puede deshacer."
+      data-confirm-button="Borrar resultado">
+  <input type="hidden" name="next" value="{{ next }}">
+  <label class="check nojs-only"><input type="checkbox" name="confirm" value="1" required> Confirmo</label>
+  {% if compact %}
+    <button class="btn btn--ghost btn--icon btn--sm" aria-label="Borrar" title="Borrar">{{ icon('trash') }}</button>
+  {% else %}
+    <button class="btn btn--danger-ghost">{{ icon('trash') }} Borrar…</button>
+  {% endif %}
+</form>
+{%- endmacro %}
+
+{% macro star_form(entry, next) -%}
+<form method="post" action="{{ url_for('output_primary', name=entry.name) }}" class="inline-form">
+  <input type="hidden" name="next" value="{{ next }}">
+  <button class="star{% if entry.primary %} is-on{% endif %}" aria-pressed="{{ 'true' if entry.primary else 'false' }}"
+          title="{{ 'Quitar como principal' if entry.primary else 'Marcar como principal' }}"
+          aria-label="{{ 'Quitar como principal' if entry.primary else 'Marcar como principal' }}">{{ icon('star') }}</button>
+</form>
+{%- endmacro %}
+
+{% macro result_row(entry, next, selectable=True, show_doc=False) -%}
+<li class="result-row{% if entry.primary %} is-primary{% endif %}" data-result="{{ entry.name }}">
+  {% if selectable %}
+    <input type="checkbox" name="names" value="{{ entry.name }}" form="bulk-results" data-select="results" aria-label="Seleccionar {{ entry.title or entry.name }}">
+  {% else %}
+    <span></span>
+  {% endif %}
+  {{ star_form(entry, next) }}
+  <div class="result-row__main">
+    <div class="result-row__line">
+      <a class="result-row__title" href="{{ url_for('output_page', name=entry.name) }}" title="{{ entry.name }}">{{ entry.title or entry.doc }}</a>
+      {{ model_tag(entry.model) }}
+      <time class="result-row__date" datetime="{{ entry.date.isoformat() }}" title="{{ entry.date|full_date }}">{{ entry.date|humanize }}</time>
+      {% if show_doc and entry.title %}<span class="muted" style="font-size:12px">{{ entry.doc }}</span>{% endif %}
+      {% if entry.status == 'partial' %}<span class="tag tag--err">parcial</span>{% endif %}
+      {% if entry.truncated %}<span class="tag tag--warn" title="{{ entry.truncated }} página{{ 's' if entry.truncated != 1 }} truncada{{ 's' if entry.truncated != 1 }}">⚠ truncado</span>{% endif %}
+      {% if entry.folder %}<span class="tag">{{ icon('folder') }} {{ entry.folder }}</span>{% endif %}
+    </div>
+    {% if entry.note %}<div class="result-row__note" title="{{ entry.note }}">{{ entry.note }}</div>{% endif %}
+  </div>
+  <div class="result-row__actions">
+    <a class="btn btn--ghost btn--icon btn--sm" href="{{ url_for('output_page', name=entry.name) }}" aria-label="Abrir" title="Abrir">{{ icon('eye') }}</a>
+    {% if entry.doc_exists %}<a class="btn btn--ghost btn--icon btn--sm" href="{{ url_for('output_page', name=entry.name, view='compare') }}" aria-label="Comparar con el PDF" title="Comparar con el PDF">{{ icon('columns') }}</a>{% endif %}
+    <a class="btn btn--ghost btn--icon btn--sm" href="{{ url_for('output_raw', name=entry.name) }}" aria-label="Descargar .md" title="Descargar .md">{{ icon('download') }}</a>
+    {% if selectable %}<button type="button" class="btn btn--ghost btn--icon btn--sm js-only" data-move-one="{{ entry.name }}" aria-label="Mover a carpeta" title="Mover a carpeta">{{ icon('folder') }}</button>{% endif %}
+    {{ delete_result_form(entry.name, next) }}
+  </div>
+</li>
+{%- endmacro %}
+
+{# Combobox de modelo + ficha + selector de razonamiento (5.4). `form_id` asocia los campos a otro formulario. #}
+{% macro model_picker(provider, id_prefix, form_id=None, info=None, config_mode=False) -%}
+{% set efforts = (info.reasoning_efforts if info and info.reasoning_efforts else ['low', 'medium', 'high']) %}
+{% if config_mode and provider.reasoning and provider.reasoning not in efforts %}{% set efforts = efforts + [provider.reasoning] %}{% endif %}
+<div class="field" data-combobox data-default-model="{{ provider.model }}">
+  <label for="{{ id_prefix }}-model">Modelo</label>
+  <div class="combo">
+    <input class="input mono" id="{{ id_prefix }}-model" type="text" value="{{ provider.model }}"
+           role="combobox" aria-expanded="false" aria-controls="{{ id_prefix }}-listbox" aria-autocomplete="list"
+           autocomplete="off" spellcheck="false" placeholder="Busca por nombre o id…" data-combo-input>
+    <input type="hidden" name="model" value="{{ provider.model }}" {% if form_id %}form="{{ form_id }}"{% endif %} data-combo-value>
+    <ul class="combo__list" id="{{ id_prefix }}-listbox" role="listbox" aria-label="Modelos" hidden data-combo-list></ul>
+  </div>
+  <div class="model-sheet" data-model-sheet aria-live="polite">
+    {% if info %}
+      {% if info.pricing.prompt is defined %}<span>Entrada {{ info.pricing.prompt|price }}</span><span>Salida {{ info.pricing.completion|price }}</span>{% endif %}
+      {% if info.context_length %}<span>{{ info.context_length|context }}</span>{% endif %}
+      {% if info.supports_reasoning %}<span class="tag tag--accent">razonamiento</span>{% endif %}
+      {% if info.supports_images is false %}<span class="warn">Este modelo no acepta imágenes; no sirve para OCR</span>{% endif %}
+    {% endif %}
+  </div>
+  <div class="combo-note" data-combo-note hidden></div>
+</div>
+<div class="field">
+  <label for="{{ id_prefix }}-reasoning">Razonamiento</label>
+  <select class="select" id="{{ id_prefix }}-reasoning" name="reasoning" {% if form_id %}form="{{ form_id }}"{% endif %}
+          data-reasoning data-config-default="{{ provider.reasoning }}" {% if config_mode %}data-config-mode{% endif %} {% if info and info.supports_reasoning is false %}disabled{% endif %}>
+    {% if config_mode %}
+      <option value="" {% if not provider.reasoning %}selected{% endif %}>No enviar</option>
+      {% for effort in efforts %}<option value="{{ effort }}" {% if effort == provider.reasoning %}selected{% endif %}>{{ effort }}</option>{% endfor %}
+    {% else %}
+      <option value="">Por defecto (config: {{ provider.reasoning or 'no enviar' }})</option>
+      {% for effort in efforts %}<option value="{{ effort }}">{{ effort }}</option>{% endfor %}
+      <option value="off">No enviar</option>
+    {% endif %}
+  </select>
+  <div class="field__hint" data-reasoning-note {% if not (info and info.supports_reasoning is false) %}hidden{% endif %}>Este modelo no admite razonamiento.</div>
+</div>
+{%- endmacro %}
