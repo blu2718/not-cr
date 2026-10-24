@@ -1,0 +1,370 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, model_tag, progress, job_card, empty, result_row, delete_doc_form, model_picker, thumb_url, job_state_text %}
+{% set nav_current = 'docs' %}
+{% set here = request.full_path.rstrip('?') %}
+{% block title %}Biblioteca{% endblock %}
+
+{% block content %}
+<header class="page-head">
+  <div>
+    <h1>Biblioteca</h1>
+    <div class="sub num">
+      {{ docs|length }} documento{{ 's' if docs|length != 1 }} · {{ total_pages|thousands }} página{{ 's' if total_pages != 1 }} · {{ results_total }} resultado{{ 's' if results_total != 1 }}
+    </div>
+  </div>
+  <div class="actions">
+    <form method="post" action="{{ url_for('upload') }}" enctype="multipart/form-data" id="upload-form" class="upload-form">
+      <input type="file" name="files" id="file-input" multiple accept="application/pdf,.pdf" class="upload-input">
+      <label for="file-input" class="btn btn--primary btn--lg js-only" tabindex="0">{{ icon('upload') }} Subir PDFs</label>
+      <button class="btn btn--primary btn--lg nojs-only">{{ icon('upload') }} Subir</button>
+    </form>
+  </div>
+</header>
+
+{# ── En curso ── #}
+<section class="section" id="en-curso" data-jobs-section {% if not jobs %}hidden{% endif %} aria-labelledby="en-curso-title">
+  <div class="section__head"><h2 id="en-curso-title">En curso</h2></div>
+  <div class="jobs-strip" data-jobs-list>
+    {% for job in jobs %}{{ job_card(job) }}{% endfor %}
+  </div>
+</section>
+
+{# ── Documentos ── #}
+<section class="section" id="documentos" aria-labelledby="documentos-title">
+  <div class="section__head">
+    <h2 id="documentos-title">Documentos<span class="count num">{{ docs|length }}</span></h2>
+    <div class="section__tools">
+      {% if docs %}
+      <label class="check js-only"><input type="checkbox" data-select-all="docs"> Seleccionar todos</label>
+      <div class="seg seg--icons js-only" role="group" aria-label="Vista">
+        <button type="button" data-view-set="grid" aria-pressed="true" title="Cuadrícula">{{ icon('layout-grid') }}<span class="sr-only">Cuadrícula</span></button>
+        <button type="button" data-view-set="list" aria-pressed="false" title="Lista">{{ icon('list') }}<span class="sr-only">Lista</span></button>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <form method="post" action="{{ url_for('docs_bulk') }}" id="bulk-docs"></form>
+
+  {% if docs %}
+    <div class="doc-grid" data-view="grid">
+      {% for doc in docs %}
+        {% set job = (jobs|selectattr('doc', 'equalto', doc.name)|selectattr('status', 'in', ['queued', 'running'])|first) %}
+        <article class="doc-card" data-doc="{{ doc.name }}" data-pages="{{ doc.pages or 0 }}" data-results="{{ doc.results }}" {% if job %}data-busy{% endif %}>
+          <label class="doc-card__check">
+            <input type="checkbox" name="names" value="{{ doc.name }}" form="bulk-docs" data-select="docs" aria-label="Seleccionar {{ doc.name }}">
+          </label>
+          <details class="menu doc-card__menu">
+            <summary aria-label="Acciones de {{ doc.name }}">{{ icon('more') }}</summary>
+            <div class="menu__list">
+              <a href="{{ url_for('doc_page', name=doc.name) }}">{{ icon('eye') }} Abrir</a>
+              <a href="{{ url_for('doc_page', name=doc.name) }}#procesar">{{ icon('play') }} Procesar…</a>
+              {{ delete_doc_form(doc.name, doc.results, button_class='danger') }}
+            </div>
+          </details>
+          <a class="doc-card__thumb" href="{{ url_for('doc_page', name=doc.name) }}" tabindex="-1" aria-hidden="true">
+            <span class="placeholder">{{ icon('file-text', 20) }}</span>
+            <img src="{{ thumb_url(doc.name, doc.version) }}" alt="" loading="lazy" onerror="this.remove()">
+            <div class="doc-card__job" data-doc-job {% if not job %}hidden{% endif %}>
+              <span><span data-doc-job-state>{% if job %}{{ job_state_text(job) }}{% endif %}</span><span data-doc-job-eta class="muted"></span></span>
+              {{ progress(job.percent if job else 0, mini=True, attrs='data-doc-job-bar') }}
+            </div>
+          </a>
+          <a class="doc-card__name" href="{{ url_for('doc_page', name=doc.name) }}" title="{{ doc.name }}">{{ doc.name }}</a>
+          <div class="doc-card__meta">
+            {% if doc.pages %}{{ doc.pages }} págs · {% endif %}{{ doc.size|filesize }} · {{ doc.results }} resultado{{ 's' if doc.results != 1 }}
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+
+    <div class="table-wrap" data-view="list" hidden>
+      <table class="doc-table">
+        <thead>
+          <tr>
+            <th><span class="sr-only">Seleccionar</span></th>
+            <th><span class="sr-only">Miniatura</span></th>
+            <th>Nombre</th>
+            <th class="hide-sm">Páginas</th>
+            <th class="hide-sm">Tamaño</th>
+            <th>Resultados</th>
+            <th class="hide-sm">Subido</th>
+            <th><span class="sr-only">Acciones</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for doc in docs %}
+            {% set job = (jobs|selectattr('doc', 'equalto', doc.name)|selectattr('status', 'in', ['queued', 'running'])|first) %}
+            <tr data-doc="{{ doc.name }}" data-pages="{{ doc.pages or 0 }}" data-results="{{ doc.results }}" {% if job %}data-busy{% endif %}>
+              <td><input type="checkbox" name="names" value="{{ doc.name }}" form="bulk-docs" data-select="docs" aria-label="Seleccionar {{ doc.name }}"></td>
+              <td><img class="thumb-sm" src="{{ thumb_url(doc.name, doc.version) }}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"></td>
+              <td>
+                <a class="name" href="{{ url_for('doc_page', name=doc.name) }}">{{ doc.name }}</a>
+                <div class="row-job" data-doc-job {% if not job %}hidden{% endif %}>
+                  <span class="muted" style="font-size:12px" data-doc-job-state>{% if job %}{{ job_state_text(job) }}{% endif %}</span>
+                  {{ progress(job.percent if job else 0, mini=True, attrs='data-doc-job-bar') }}
+                </div>
+              </td>
+              <td class="hide-sm num">{{ doc.pages or '—' }}</td>
+              <td class="hide-sm num">{{ doc.size|filesize }}</td>
+              <td class="num">{{ doc.results }}</td>
+              <td class="hide-sm"><time datetime="{{ doc.uploaded.isoformat() }}" title="{{ doc.uploaded|full_date }}">{{ doc.uploaded|humanize }}</time></td>
+              <td>
+                <details class="menu">
+                  <summary aria-label="Acciones de {{ doc.name }}">{{ icon('more') }}</summary>
+                  <div class="menu__list">
+                    <a href="{{ url_for('doc_page', name=doc.name) }}">{{ icon('eye') }} Abrir</a>
+                    <a href="{{ url_for('doc_page', name=doc.name) }}#procesar">{{ icon('play') }} Procesar…</a>
+                    {{ delete_doc_form(doc.name, doc.results, button_class='danger') }}
+                  </div>
+                </details>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {# Sin JS: acciones en bulk como formulario clásico. Con JS: barra flotante. #}
+    <div class="selbar nojs-only">
+      <span class="selbar__count">Seleccionados:</span>
+      <select class="select" name="action" form="bulk-docs" aria-label="Acción" style="width:auto">
+        <option value="process">Procesar con el modelo por defecto</option>
+        <option value="delete_pdf">Borrar solo los PDFs</option>
+        <option value="delete_all">Borrar PDFs y resultados</option>
+      </select>
+      <label class="check"><input type="checkbox" name="confirm" value="1" form="bulk-docs"> Confirmo el borrado</label>
+      <button class="btn" form="bulk-docs">Aplicar</button>
+    </div>
+  {% else %}
+    {% call empty('') %}Arrastra PDFs aquí o pulsa <strong>Subir PDFs</strong>.{% endcall %}
+  {% endif %}
+</section>
+
+{# ── Resultados ── #}
+<section class="section" id="resultados" data-refresh aria-labelledby="resultados-title">
+  <div class="section__head">
+    <h2 id="resultados-title">Resultados<span class="count num">{% if results_shown != results_total %}{{ results_shown }} de {% endif %}{{ results_total }}</span></h2>
+    <div class="section__tools">
+      {% if filters.folder and filters.folder != no_folder %}
+        <button type="button" class="btn btn--ghost btn--sm js-only" data-dialog-open="rename-folder-dialog">{{ icon('pencil') }} Renombrar carpeta</button>
+        <form method="post" action="{{ url_for('folder_delete') }}" class="inline-form"
+              data-confirm data-confirm-title="Borrar la carpeta «{{ filters.folder }}»"
+              data-confirm-text="Sus resultados pasan a «Sin carpeta». No se borra ningún resultado."
+              data-confirm-button="Borrar carpeta">
+          <input type="hidden" name="name" value="{{ filters.folder }}">
+          <input type="hidden" name="next" value="{{ url_for('index') }}#resultados">
+          <label class="check nojs-only"><input type="checkbox" name="confirm" value="1" required> Confirmo</label>
+          <button class="btn btn--danger-ghost btn--sm">{{ icon('trash') }} Borrar carpeta</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if results_total %}
+  <form class="toolbar" method="get" action="{{ url_for('index') }}#resultados" data-filters>
+    <div class="search">
+      {{ icon('search') }}
+      <input class="input" type="search" name="q" value="{{ filters.q }}" placeholder="Buscar título, documento o nota" aria-label="Buscar resultados" data-search>
+      <kbd class="js-only" aria-hidden="true">/</kbd>
+    </div>
+    <div class="chip-select{% if filters.model %} is-active{% endif %}">
+      <select class="select" name="model" aria-label="Filtrar por modelo" data-autosubmit>
+        <option value="">Modelo: todos</option>
+        {% for m in models %}<option value="{{ m }}" {% if m == filters.model %}selected{% endif %}>{{ m|model_short }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="chip-select{% if filters.folder %} is-active{% endif %}">
+      <select class="select" name="folder" aria-label="Filtrar por carpeta" data-autosubmit>
+        <option value="">Carpeta: todas</option>
+        <option value="{{ no_folder }}" {% if filters.folder == no_folder %}selected{% endif %}>Sin carpeta</option>
+        {% for f in folders %}<option value="{{ f }}" {% if f == filters.folder %}selected{% endif %}>{{ f }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="chip-select">
+      <select class="select" name="sort" aria-label="Ordenar" data-autosubmit>
+        {% for key, label in sorts.items() %}<option value="{{ key }}" {% if key == filters.sort %}selected{% endif %}>Orden: {{ label|lower }}</option>{% endfor %}
+      </select>
+    </div>
+    <input type="hidden" name="view" value="{{ filters.view }}">
+    <button class="btn nojs-only">Aplicar</button>
+    <div class="seg" role="group" aria-label="Agrupar" style="margin-left:auto">
+      <a href="{{ url_for('index', q=filters.q or None, model=filters.model or None, folder=filters.folder or None, sort=filters.sort, view='doc') }}#resultados" {% if filters.view == 'doc' %}aria-current="true"{% endif %}>Por documento</a>
+      <a href="{{ url_for('index', q=filters.q or None, model=filters.model or None, folder=filters.folder or None, sort=filters.sort, view='folder') }}#resultados" {% if filters.view == 'folder' %}aria-current="true"{% endif %}>Por carpeta</a>
+    </div>
+  </form>
+
+  {% if filters.q or filters.model or filters.folder %}
+  <div class="active-filters">
+    {% if filters.q %}<span class="chip">«{{ filters.q }}»<a href="{{ url_for('index', model=filters.model or None, folder=filters.folder or None, sort=filters.sort, view=filters.view) }}#resultados" aria-label="Quitar búsqueda">{{ icon('x') }}</a></span>{% endif %}
+    {% if filters.model %}<span class="chip">{{ filters.model|model_short }}<a href="{{ url_for('index', q=filters.q or None, folder=filters.folder or None, sort=filters.sort, view=filters.view) }}#resultados" aria-label="Quitar filtro de modelo">{{ icon('x') }}</a></span>{% endif %}
+    {% if filters.folder %}<span class="chip">{{ icon('folder') }} {{ 'Sin carpeta' if filters.folder == no_folder else filters.folder }}<a href="{{ url_for('index', q=filters.q or None, model=filters.model or None, sort=filters.sort, view=filters.view) }}#resultados" aria-label="Quitar filtro de carpeta">{{ icon('x') }}</a></span>{% endif %}
+  </div>
+  {% endif %}
+  {% endif %}
+
+  <form method="post" action="{{ url_for('output_bulk') }}" id="bulk-results">
+    <input type="hidden" name="next" value="{{ here }}#resultados">
+  </form>
+
+  {% if groups %}
+    {% for group in groups %}
+      <div class="group" data-group>
+        <div class="group__head">
+          {% if group.doc %}
+            {% if group.doc_exists %}
+              <img class="thumb-xs" src="{{ url_for('doc_thumb', name=group.doc) }}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
+              <h3><a href="{{ url_for('doc_page', name=group.doc) }}">{{ group.label }}</a></h3>
+            {% else %}
+              <span class="thumb-xs generic">{{ icon('file') }}</span>
+              <h3>{{ group.label }}</h3>
+              <span class="tag">PDF eliminado</span>
+            {% endif %}
+          {% else %}
+            <span class="thumb-xs generic">{{ icon('folder') }}</span>
+            <h3>{{ group.label }}</h3>
+          {% endif %}
+          <span class="count num">{{ group.results|length }}</span>
+          <label class="check group-all js-only muted" style="font-size:12px"><input type="checkbox" data-select-group> Todos</label>
+        </div>
+        <ul class="group__rows">
+          {% for entry in group.results %}{{ result_row(entry, here ~ '#resultados', show_doc=(filters.view == 'folder')) }}{% endfor %}
+        </ul>
+      </div>
+    {% endfor %}
+
+    <div class="selbar nojs-only">
+      <span class="selbar__count">Seleccionados:</span>
+      <select class="select" name="action" form="bulk-results" aria-label="Acción" style="width:auto">
+        <option value="move">Mover a la carpeta…</option>
+        <option value="delete">Borrar</option>
+      </select>
+      <input class="input" name="folder" form="bulk-results" list="folder-options" placeholder="Carpeta (vacío = sin carpeta)" style="width:auto">
+      <label class="check"><input type="checkbox" name="confirm" value="1" form="bulk-results"> Confirmo el borrado</label>
+      <button class="btn" form="bulk-results">Aplicar</button>
+    </div>
+  {% elif results_total %}
+    {% call empty('', illustration=False) %}Ningún resultado coincide con los filtros. <a href="{{ url_for('index') }}#resultados">Quitar filtros</a>{% endcall %}
+  {% else %}
+    {% call empty('', illustration=False) %}Aún no hay resultados. Procesa un documento para empezar.{% endcall %}
+  {% endif %}
+</section>
+
+<datalist id="folder-options">
+  {% for f in folders %}<option value="{{ f }}">{% endfor %}
+</datalist>
+
+{# Barras de selección flotantes (JS) #}
+<div class="selbar-wrap js-only">
+  <div class="selbar" data-selbar="docs" hidden>
+    <span class="selbar__count" data-selbar-count>0 seleccionados</span>
+    <button type="button" class="btn btn--primary btn--sm" data-dialog-open="bulk-process-dialog">{{ icon('play') }} Procesar…</button>
+    <button type="button" class="btn btn--sm" data-dialog-open="bulk-delete-docs-dialog">{{ icon('trash') }} Borrar…</button>
+    <button type="button" class="btn btn--ghost btn--icon btn--sm" data-selbar-clear aria-label="Limpiar selección">{{ icon('x') }}</button>
+  </div>
+  <div class="selbar" data-selbar="results" hidden>
+    <span class="selbar__count" data-selbar-count>0 seleccionados</span>
+    <button type="button" class="btn btn--sm" data-dialog-open="move-dialog">{{ icon('folder') }} Mover a…</button>
+    <button type="button" class="btn btn--sm" data-dialog-open="bulk-delete-results-dialog">{{ icon('trash') }} Borrar…</button>
+    <button type="button" class="btn btn--ghost btn--icon btn--sm" data-selbar-clear aria-label="Limpiar selección">{{ icon('x') }}</button>
+  </div>
+</div>
+
+{# Velo de arrastrar y soltar + panel de subidas #}
+<div class="dropveil" data-dropveil hidden>
+  <div class="dropveil__box">{{ icon('upload', 20) }} Suelta los PDFs para subirlos</div>
+</div>
+<div class="uploads" data-uploads hidden aria-live="polite">
+  <div class="uploads__head"><span data-uploads-title>Subiendo</span><button type="button" class="btn btn--ghost btn--icon btn--sm" data-uploads-close aria-label="Cerrar">{{ icon('x') }}</button></div>
+  <ul class="uploads__list" data-uploads-list></ul>
+</div>
+{% endblock %}
+
+{% block dialogs %}
+<dialog class="dialog" id="bulk-process-dialog" aria-labelledby="bulk-process-title">
+  <div class="dialog__body">
+    <h2 id="bulk-process-title">Procesar documentos</h2>
+    <p class="num" data-bulk-summary></p>
+    {{ model_picker(provider, 'bulk', form_id='bulk-docs') }}
+  </div>
+  <div class="dialog__foot">
+    <button type="button" class="btn" data-dialog-close>Cancelar</button>
+    <button class="btn btn--primary" name="action" value="process" form="bulk-docs" data-needs-vision data-bulk-process-button>{{ icon('play') }} Procesar</button>
+  </div>
+</dialog>
+
+<dialog class="dialog" id="bulk-delete-docs-dialog" aria-labelledby="bulk-delete-docs-title">
+  <div class="dialog__body">
+    <h2 id="bulk-delete-docs-title" data-bulk-delete-title>Borrar documentos</h2>
+    <label class="choice">
+      <input type="radio" name="action" value="delete_pdf" form="bulk-docs" checked disabled data-delete-choice>
+      <span><strong>Solo los PDFs</strong><span data-text-pdf></span></span>
+    </label>
+    <label class="choice">
+      <input type="radio" name="action" value="delete_all" form="bulk-docs" disabled data-delete-choice>
+      <span><strong>PDFs y resultados</strong><span data-text-all></span></span>
+    </label>
+    <div data-skipped hidden>
+      <p style="margin:12px 0 4px">Se omitirán por tener un trabajo en curso:</p>
+      <ul class="dialog__list" data-skipped-list></ul>
+    </div>
+    <input type="hidden" name="confirm" value="1" form="bulk-docs" disabled data-bulk-confirm>
+  </div>
+  <div class="dialog__foot">
+    <button type="button" class="btn" data-dialog-close>Cancelar</button>
+    <button class="btn btn--danger" form="bulk-docs" data-bulk-delete-button>Borrar</button>
+  </div>
+</dialog>
+
+<dialog class="dialog" id="bulk-delete-results-dialog" aria-labelledby="bulk-delete-results-title">
+  <div class="dialog__body">
+    <h2 id="bulk-delete-results-title" data-results-delete-title>Borrar resultados</h2>
+    <p>Se borran los Markdown y sus metadatos. No se puede deshacer.</p>
+    <input type="hidden" name="confirm" value="1" form="bulk-results" disabled data-results-confirm>
+  </div>
+  <div class="dialog__foot">
+    <button type="button" class="btn" data-dialog-close>Cancelar</button>
+    <button class="btn btn--danger" name="action" value="delete" form="bulk-results" data-results-delete-button>Borrar</button>
+  </div>
+</dialog>
+
+<dialog class="dialog" id="move-dialog" aria-labelledby="move-title">
+  <div class="dialog__body">
+    <h2 id="move-title" data-move-title>Mover a carpeta</h2>
+    <div class="field">
+      <label for="move-folder">Carpeta</label>
+      <input class="input" id="move-folder" name="folder" form="bulk-results" list="folder-options" maxlength="60" autocomplete="off" placeholder="Vacío = sin carpeta" data-move-folder>
+      <div class="field__hint">Escribe un nombre nuevo para crear la carpeta.</div>
+    </div>
+  </div>
+  <div class="dialog__foot">
+    <button type="button" class="btn" data-dialog-close>Cancelar</button>
+    <button class="btn btn--primary" name="action" value="move" form="bulk-results">{{ icon('folder') }} Mover</button>
+  </div>
+</dialog>
+
+{% if filters.folder and filters.folder != no_folder %}
+<dialog class="dialog" id="rename-folder-dialog" aria-labelledby="rename-folder-title">
+  <form method="post" action="{{ url_for('folder_rename') }}">
+    <div class="dialog__body">
+      <h2 id="rename-folder-title">Renombrar carpeta</h2>
+      <input type="hidden" name="old" value="{{ filters.folder }}">
+      <input type="hidden" name="next" value="{{ here }}#resultados">
+      <div class="field">
+        <label for="rename-folder-new">Nuevo nombre</label>
+        <input class="input" id="rename-folder-new" name="new" value="{{ filters.folder }}" maxlength="60" required pattern="[^/]+" autocomplete="off">
+      </div>
+    </div>
+    <div class="dialog__foot">
+      <button type="button" class="btn" data-dialog-close>Cancelar</button>
+      <button class="btn btn--primary">Renombrar</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='combobox.js') }}"></script>
+<script src="{{ url_for('static', filename='index.js') }}"></script>
+{% endblock %}

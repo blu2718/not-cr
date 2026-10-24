@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, job_card, result_row, delete_doc_form, model_picker %}
+{% block title %}{{ doc.name }}{% endblock %}
+
+{% block content %}
+<header class="page-head">
+  <div>
+    <h1>{{ doc.name }}</h1>
+    <div class="sub num">
+      {% if doc.pages %}{{ doc.pages }} págs · {% endif %}{{ doc.size|filesize }} · subido <time datetime="{{ doc.uploaded.isoformat() }}" title="{{ doc.uploaded|full_date }}">{{ doc.uploaded|humanize }}</time>
+    </div>
+  </div>
+  <div class="actions">
+    <a class="btn btn--ghost" href="{{ url_for('index') }}">{{ icon('arrow-left') }} Biblioteca</a>
+    <details class="menu">
+      <summary aria-label="Más acciones">{{ icon('more') }}</summary>
+      <div class="menu__list">
+        <a href="{{ url_for('doc_file', name=doc.name) }}" target="_blank" rel="noopener">{{ icon('external-link') }} Abrir PDF</a>
+        {{ delete_doc_form(doc.name, results|length, button_class='danger') }}
+      </div>
+    </details>
+  </div>
+</header>
+
+<div class="doc-layout">
+  <div>
+    <embed class="pdf-view" src="{{ url_for('doc_file', name=doc.name) }}" type="application/pdf" title="Vista previa de {{ doc.name }}.pdf">
+    <a class="pdf-view__link" href="{{ url_for('doc_file', name=doc.name) }}" target="_blank" rel="noopener">{{ icon('external-link') }} Abrir PDF en pestaña nueva</a>
+  </div>
+
+  <aside class="doc-side">
+    <section class="card" id="procesar" aria-labelledby="procesar-title">
+      <h2 id="procesar-title">Procesar</h2>
+      <form method="post" action="{{ url_for('process_doc', name=doc.name) }}">
+        {{ model_picker(provider, 'doc', info=default_info) }}
+        <button class="btn btn--primary btn--lg btn--block" data-needs-vision {% if default_info and default_info.supports_images is false %}disabled{% endif %}>
+          {{ icon('play') }} Procesar{% if doc.pages %} {{ doc.pages }} página{{ 's' if doc.pages != 1 }}{% endif %}
+        </button>
+      </form>
+    </section>
+
+    <section data-jobs-section data-jobs-doc="{{ doc.name }}" {% if not jobs %}hidden{% endif %} aria-labelledby="doc-jobs-title">
+      <h2 id="doc-jobs-title">En curso</h2>
+      <div class="jobs-list" data-jobs-list>
+        {% for job in jobs %}{{ job_card(job) }}{% endfor %}
+      </div>
+    </section>
+
+    <section id="historial" data-refresh aria-labelledby="historial-title">
+      <h2 id="historial-title">Historial <span class="muted num" style="font: 400 13px var(--font-ui)">{{ results|length }}</span></h2>
+      {% if results %}
+        <ul class="group__rows">
+          {% for entry in results %}{{ result_row(entry, request.path, selectable=False) }}{% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted">Todavía no hay resultados de este documento.</p>
+      {% endif %}
+    </section>
+  </aside>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='combobox.js') }}"></script>
+<script src="{{ url_for('static', filename='index.js') }}"></script>
+{% endblock %}
