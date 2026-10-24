@@ -38,9 +38,10 @@ import processing_text
 import providers
 
 BASE_DIR = Path(__file__).resolve().parent
-CONFIG_PATH = BASE_DIR / "config.json"
-DOCS_DIR = BASE_DIR / "docs"
-OUTPUT_DIR = BASE_DIR / "output"
+# Anclados al proyecto; en Docker se apuntan al volumen de datos por entorno.
+CONFIG_PATH = Path(os.environ.get("NOT_CR_CONFIG_PATH") or BASE_DIR / "config.json")
+DOCS_DIR = Path(os.environ.get("NOT_CR_DOCS_DIR") or BASE_DIR / "docs")
+OUTPUT_DIR = Path(os.environ.get("NOT_CR_OUTPUT_DIR") or BASE_DIR / "output")
 
 
 # ── Configuración ────────────────────────────────────────────────────────────
@@ -95,6 +96,16 @@ def load_config_or_empty() -> dict:
 app = Flask(__name__)
 app.secret_key = os.environ.get("NOT_CR_SECRET") or secrets.token_hex(32)
 app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
+
+
+@app.url_defaults
+def static_version(endpoint, values):
+    """`?v=<mtime>` en los estáticos: el proxy y el navegador los cachean por URL."""
+    if endpoint == "static" and "filename" in values:
+        try:
+            values["v"] = int((Path(app.static_folder) / values["filename"]).stat().st_mtime)
+        except OSError:
+            pass
 
 
 # ── Utilidades ───────────────────────────────────────────────────────────────

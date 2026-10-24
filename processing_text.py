@@ -1,6 +1,7 @@
+import os
 from pathlib import Path
 
-OUTPUT_DIR = Path(__file__).resolve().parent / "output"
+OUTPUT_DIR = Path(os.environ.get("NOT_CR_OUTPUT_DIR") or Path(__file__).resolve().parent / "output")
 
 WRAPPER_OPENINGS = ("```markdown", "```")
 

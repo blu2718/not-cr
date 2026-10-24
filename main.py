@@ -1,4 +1,5 @@
 import json
+import os
 import shutil
 import tempfile
 from pathlib import Path
@@ -7,7 +8,7 @@ import ocr
 import processing_text
 
 BASE_DIR = Path(__file__).resolve().parent
-CONFIG_PATH = BASE_DIR / "config.json"
+CONFIG_PATH = Path(os.environ.get("NOT_CR_CONFIG_PATH") or BASE_DIR / "config.json")
 
 
 def load_config() -> dict:
