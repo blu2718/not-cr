@@ -1,36 +1,54 @@
-import os
 import json
+import shutil
+import tempfile
+from pathlib import Path
 
-import processing_images
-import processing_pdf
+import ocr
 import processing_text
 
-
-def run_ai_ocr(pdf_file, api_key, model):
-    print("Convirtiendo PDF a imágenes")
-    processing_pdf.convert(pdf_file)
-
-    # TODO: agregar lógica para procesar el documento entero por lotes.
-
-    processing_text.to_md(
-        "output.json", pdf_file.removesuffix(".pdf").removeprefix("docs/")
-    )
-
-    print("Listo!")
+BASE_DIR = Path(__file__).resolve().parent
+CONFIG_PATH = BASE_DIR / "config.json"
 
 
-pdfs = []
+def load_config() -> dict:
+    return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
 
-for file in os.listdir("docs/"):
-    if file.endswith(".pdf"):
-        pdfs.append(file)
 
-with open("config.json", "r") as file:
-    config = json.load(file)
+def run_ai_ocr(
+    pdf_path,
+    api_key,
+    model,
+    base_url=None,
+    reasoning=None,
+    on_chunk=None,
+    on_event=None,
+    output_name=None,
+) -> None:
+    if on_event:
+        on_event("log", f"[ Procesando {Path(pdf_path).name} ]")
 
-key = config["openrouter"]["api-key"]
-model = config["openrouter"]["model"]
+    image_dir = tempfile.mkdtemp(prefix="not-cr-")
 
-for doc in pdfs:
-    print(f"[ Procesando {doc} ]")
-    run_ai_ocr("docs/" + doc, key, model)
+    extra = {}
+    if base_url is not None:
+        extra["base_url"] = base_url
+    if reasoning is not None:
+        extra["reasoning"] = reasoning
+    if on_event is not None:
+        extra["on_event"] = on_event
+
+    try:
+        contenido = ocr.process_pdf(
+            pdf_path, image_dir, api_key, model, on_chunk=on_chunk, **extra
+        )
+
+        if on_event:
+            on_event("log", "└ Guardando a Markdown")
+            on_event("status", {"step": "saving"})
+
+        processing_text.to_md(contenido, output_name or Path(pdf_path).stem)
+
+        if on_event:
+            on_event("log", "Listo!")
+    finally:
+        shutil.rmtree(image_dir, ignore_errors=True)
