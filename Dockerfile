@@ -14,8 +14,17 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     NOT_CR_PORT=5000 \
     PATH="/app/.venv/bin:$PATH"
 
+# poppler: PDF → imágenes. LibreOffice (sin GUI) + fuentes con las métricas de
+# las de Office: DOCX/PPTX → PDF.
 RUN apt-get update \
-    && apt-get install --no-install-recommends -y poppler-utils \
+    && apt-get install --no-install-recommends -y \
+        poppler-utils \
+        libreoffice-writer-nogui \
+        libreoffice-impress-nogui \
+        fonts-liberation \
+        fonts-crosextra-carlito \
+        fonts-crosextra-caladea \
+        fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
