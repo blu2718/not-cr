@@ -303,9 +303,9 @@
     var deletable = docs.filter(function (d) { return !d.busy; });
     var results = deletable.reduce(function (sum, d) { return sum + d.results; }, 0);
     $("[data-bulk-delete-title]", dialog).textContent = "Borrar " + plural(deletable.length, "documento");
-    $("[data-text-pdf]", dialog).textContent = results
-      ? "Se conservan sus " + plural(results, "resultado") + "."
-      : "No tienen resultados.";
+    $("[data-text-pdf]", dialog).textContent = results === 1
+      ? "Se conserva su resultado."
+      : results ? "Se conservan sus " + plural(results, "resultado") + "." : "No tienen resultados.";
     $("[data-text-all]", dialog).textContent = "Se borran " + plural(deletable.length, "PDF", "PDFs") +
       " y " + plural(results, "resultado") + ". No se puede deshacer.";
     var skippedBox = $("[data-skipped]", dialog);

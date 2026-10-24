@@ -61,9 +61,9 @@
   --tag-fg-l: 45%;
   --tag-fg-c: 0.12;
 
-  --ok-soft: color-mix(in oklch, var(--ok) 12%, var(--surface));
-  --warn-soft: color-mix(in oklch, var(--warn) 12%, var(--surface));
-  --err-soft: color-mix(in oklch, var(--err) 12%, var(--surface));
+  --ok-soft: color-mix(in oklab, var(--ok) 12%, var(--surface));
+  --warn-soft: color-mix(in oklab, var(--warn) 12%, var(--surface));
+  --err-soft: color-mix(in oklab, var(--err) 12%, var(--surface));
 
   --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-serif: "Source Serif 4", Georgia, serif;
@@ -405,7 +405,7 @@ details > summary.nav__link {
     gap: var(--s-2);
     padding: var(--s-2) var(--s-4);
     border-bottom: 1px solid var(--border);
-    background: color-mix(in oklch, var(--bg) 88%, transparent);
+    background: color-mix(in oklab, var(--bg) 88%, transparent);
     backdrop-filter: blur(8px);
   }
   .content {
@@ -519,7 +519,7 @@ details > summary.nav__link {
   color: var(--on-accent);
 }
 .btn--primary:hover {
-  background: color-mix(in oklch, var(--accent) 88%, var(--text));
+  background: color-mix(in oklab, var(--accent) 88%, var(--text));
 }
 .btn--ghost {
   border-color: transparent;
@@ -534,7 +534,7 @@ details > summary.nav__link {
   color: var(--on-accent);
 }
 .btn--danger:hover {
-  background: color-mix(in oklch, var(--err) 88%, var(--text));
+  background: color-mix(in oklab, var(--err) 88%, var(--text));
 }
 .btn--danger-ghost {
   border-color: transparent;
@@ -609,7 +609,7 @@ details > summary.nav__link {
 .input:hover,
 .select:hover,
 .textarea:hover {
-  border-color: color-mix(in oklch, var(--border) 60%, var(--muted));
+  border-color: color-mix(in oklab, var(--border) 60%, var(--muted));
 }
 .input:focus-visible,
 .select:focus-visible,
@@ -850,7 +850,7 @@ input[type="radio"] {
   transition: border-color 150ms ease-out;
 }
 .job-card:hover {
-  border-color: color-mix(in oklch, var(--border) 50%, var(--accent));
+  border-color: color-mix(in oklab, var(--border) 50%, var(--accent));
   text-decoration: none;
 }
 .job-card__thumb {
@@ -893,6 +893,12 @@ input[type="radio"] {
 .job-card .progress {
   align-self: center;
 }
+.job-card__meta .tag {
+  max-width: 62%;
+}
+.jobs-list .job-card {
+  flex: none;
+}
 
 /* ── Documentos ──────────────────────────────────────────────────────────── */
 
@@ -900,6 +906,12 @@ input[type="radio"] {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
   gap: var(--s-5) var(--s-4);
+}
+@media (max-width: 600px) {
+  .doc-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--s-4) var(--s-3);
+  }
 }
 .doc-card {
   position: relative;
@@ -970,7 +982,7 @@ input[type="radio"] {
   opacity: 0;
   transition: opacity 150ms ease-out;
 }
-.doc-card__menu {
+.menu.doc-card__menu {
   position: absolute;
   top: var(--s-2);
   right: var(--s-2);
@@ -1008,7 +1020,7 @@ input[type="radio"] {
   flex-direction: column;
   gap: 4px;
   padding: var(--s-2);
-  background: color-mix(in oklch, var(--surface) 92%, transparent);
+  background: color-mix(in oklab, var(--surface) 92%, transparent);
   backdrop-filter: blur(4px);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
@@ -1158,6 +1170,7 @@ input[type="radio"] {
 }
 .chip-select .select {
   width: auto;
+  max-width: 220px;
   height: 32px;
   padding-right: 28px;
   border-radius: 999px;
@@ -1195,7 +1208,7 @@ input[type="radio"] {
   color: inherit;
 }
 .chip a:hover {
-  background: color-mix(in oklch, var(--accent) 15%, transparent);
+  background: color-mix(in oklab, var(--accent) 15%, transparent);
 }
 
 .seg {
@@ -1543,7 +1556,7 @@ input[type="radio"] {
   color: var(--ok);
 }
 .toast--error {
-  border-color: color-mix(in oklch, var(--err) 40%, var(--border));
+  border-color: color-mix(in oklab, var(--err) 40%, var(--border));
 }
 .toast--error .icon {
   color: var(--err);
@@ -1567,7 +1580,7 @@ html:not(.js) .toasts {
   z-index: 70;
   display: grid;
   place-items: center;
-  background: color-mix(in oklch, var(--accent) 14%, oklch(0% 0 0 / 0.25));
+  background: color-mix(in oklab, var(--accent) 14%, oklch(0% 0 0 / 0.25));
   backdrop-filter: blur(2px);
   pointer-events: none;
 }
@@ -1776,6 +1789,15 @@ html:not(.js) .toasts {
 .doc-side .group__rows {
   margin-left: 0;
 }
+.doc-side .result-row {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+.doc-side .result-row > span:first-child {
+  display: none;
+}
+.doc-side .result-row__actions {
+  grid-column: 2;
+}
 .doc-side h2 {
   font: 600 16px/1.3 var(--font-serif);
   margin-bottom: var(--s-2);
@@ -1848,7 +1870,7 @@ html:not(.js) .toasts {
   animation: pulse 1.2s ease-in-out infinite;
 }
 .pagemap__cell.is-done {
-  background: color-mix(in oklch, var(--accent) 60%, var(--surface));
+  background: color-mix(in oklab, var(--accent) 60%, var(--surface));
   box-shadow: none;
 }
 .pagemap__cell.is-truncated {
@@ -1872,11 +1894,11 @@ html:not(.js) .toasts {
   margin-bottom: var(--s-5);
 }
 .job-final--ok {
-  border-color: color-mix(in oklch, var(--ok) 35%, var(--border));
+  border-color: color-mix(in oklab, var(--ok) 35%, var(--border));
   background: var(--ok-soft);
 }
 .job-final--err {
-  border-color: color-mix(in oklch, var(--err) 35%, var(--border));
+  border-color: color-mix(in oklab, var(--err) 35%, var(--border));
   background: var(--err-soft);
 }
 .job-final__icon {
@@ -1967,14 +1989,14 @@ html:not(.js) .toasts {
   gap: var(--s-2) var(--s-3);
   padding: var(--s-3) var(--s-7);
   border-bottom: 1px solid var(--border);
-  background: color-mix(in oklch, var(--bg) 90%, transparent);
+  background: color-mix(in oklab, var(--bg) 90%, transparent);
   backdrop-filter: blur(8px);
 }
 .reader-bar__title {
   display: flex;
   align-items: center;
   gap: var(--s-2);
-  flex: 1 1 260px;
+  flex: 1 1 420px;
   min-width: 0;
 }
 .title-edit {

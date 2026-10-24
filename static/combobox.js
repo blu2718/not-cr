@@ -153,13 +153,19 @@
       if (!reasoning) return;
       var configMode = reasoning.hasAttribute("data-config-mode");
       var current = reasoning.value;
-      if (model && model.supports_reasoning === false) {
+      // En /config el valor es solo un default: nunca se deshabilita (un <select>
+      // deshabilitado no se envía y se perdería el valor guardado).
+      if (model && model.supports_reasoning === false && !configMode) {
         reasoning.disabled = true;
         if (reasoningNote) reasoningNote.hidden = false;
         return;
       }
+      if (configMode && reasoningNote) {
+        reasoningNote.hidden = !(model && model.supports_reasoning === false);
+        reasoningNote.textContent = "El modelo por defecto no admite razonamiento; con él se ignorará.";
+      }
       reasoning.disabled = false;
-      if (reasoningNote) reasoningNote.hidden = true;
+      if (reasoningNote && !configMode) reasoningNote.hidden = true;
       var efforts = model && model.reasoning_efforts && model.reasoning_efforts.length
         ? model.reasoning_efforts.slice()
         : ["low", "medium", "high"];

@@ -69,11 +69,11 @@
   <div class="nojs-only" data-choices>
     <label class="choice">
       <input type="radio" name="mode" value="pdf" checked data-button="Borrar solo el PDF">
-      <span><strong>Solo el PDF</strong><span>{% if results_count %}Se conservan sus {{ results_count }} resultado{{ 's' if results_count != 1 }}.{% else %}No tiene resultados.{% endif %}</span></span>
+      <span><strong>Solo el PDF</strong><span>{% if results_count == 1 %}Se conserva su resultado.{% elif results_count %}Se conservan sus {{ results_count }} resultados.{% else %}No tiene resultados.{% endif %}</span></span>
     </label>
     <label class="choice">
       <input type="radio" name="mode" value="all" data-button="Borrar PDF{% if results_count %} y {{ results_count }} resultado{{ 's' if results_count != 1 }}{% endif %}">
-      <span><strong>PDF y resultados</strong><span>Se borran el PDF y {{ results_count }} resultado{{ 's' if results_count != 1 }}. No se puede deshacer.</span></span>
+      <span><strong>PDF y resultados</strong><span>{% if results_count %}Se borran el PDF y {{ results_count }} resultado{{ 's' if results_count != 1 }}{% else %}Se borra el PDF{% endif %}. No se puede deshacer.</span></span>
     </label>
     <label class="check confirm-box"><input type="checkbox" name="confirm" value="1" required> Confirmo el borrado</label>
   </div>
@@ -161,7 +161,7 @@
 <div class="field">
   <label for="{{ id_prefix }}-reasoning">Razonamiento</label>
   <select class="select" id="{{ id_prefix }}-reasoning" name="reasoning" {% if form_id %}form="{{ form_id }}"{% endif %}
-          data-reasoning data-config-default="{{ provider.reasoning }}" {% if config_mode %}data-config-mode{% endif %} {% if info and info.supports_reasoning is false %}disabled{% endif %}>
+          data-reasoning data-config-default="{{ provider.reasoning }}" {% if config_mode %}data-config-mode{% endif %} {% if info and info.supports_reasoning is false and not config_mode %}disabled{% endif %}>
     {% if config_mode %}
       <option value="" {% if not provider.reasoning %}selected{% endif %}>No enviar</option>
       {% for effort in efforts %}<option value="{{ effort }}" {% if effort == provider.reasoning %}selected{% endif %}>{{ effort }}</option>{% endfor %}
