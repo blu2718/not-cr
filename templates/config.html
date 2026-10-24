@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, model_picker %}
+{% set nav_current = 'config' %}
+{% block title %}Configuración{% endblock %}
+
+{% block content %}
+<header class="page-head">
+  <div>
+    <h1>Configuración</h1>
+    <div class="sub">Conexión con OpenRouter y valores por defecto del procesado.{% if not config_exists %} Aún no hay <code>config.json</code>: se creará al guardar.{% endif %}</div>
+  </div>
+</header>
+
+<form class="card config-card" method="post" action="{{ url_for('config_save') }}" id="config-form" autocomplete="off">
+  <fieldset class="fieldset">
+    <legend>OpenRouter</legend>
+    <div class="field">
+      <label for="api-url">URL base</label>
+      <input class="input mono" id="api-url" name="api-url" type="url" value="{{ provider['api-url'] }}" required spellcheck="false">
+      <div class="field__hint">Sin <code>/chat/completions</code>: el SDK añade la ruta.</div>
+    </div>
+    <div class="field">
+      <label for="api-key">API key</label>
+      <input class="input mono" id="api-key" name="api-key" type="password" value="" placeholder="{{ key_hint }}" autocomplete="new-password" spellcheck="false">
+      <div class="field__hint">Déjalo vacío para conservar la key guardada. La key nunca se envía al navegador.</div>
+      {% if has_key %}<label class="check"><input type="checkbox" name="clear_key" value="1"> Borrar la key guardada</label>{% endif %}
+    </div>
+  </fieldset>
+
+  <fieldset class="fieldset">
+    <legend>Valores por defecto</legend>
+    {{ model_picker(provider, 'config', config_mode=True) }}
+  </fieldset>
+
+  <div class="form-actions">
+    <button class="btn btn--primary btn--lg">{{ icon('check') }} Guardar</button>
+    <button class="btn btn--lg" formaction="{{ url_for('config_test') }}" data-test-connection>{{ icon('play') }} Probar conexión</button>
+  </div>
+  <div class="test-result" data-test-result aria-live="polite" hidden></div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='combobox.js') }}"></script>
+<script>
+  (function () {
+    var form = document.getElementById("config-form");
+    var button = form.querySelector("[data-test-connection]");
+    var result = form.querySelector("[data-test-result]");
+    button.addEventListener("click", function (event) {
+      event.preventDefault();
+      button.classList.add("is-loading");
+      button.disabled = true;
+      result.hidden = true;
+      var data = new FormData(form);
+      fetch(button.getAttribute("formaction"), {
+        method: "POST",
+        body: data,
+        headers: { Accept: "application/json" }
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (body) {
+          result.textContent = body.message;
+          result.className = "test-result " + (body.ok ? "ok" : "ko");
+        })
+        .catch(function (err) {
+          result.textContent = "Error: " + err;
+          result.className = "test-result ko";
+        })
+        .finally(function () {
+          result.hidden = false;
+          button.classList.remove("is-loading");
+          button.disabled = false;
+        });
+    });
+  })();
+</script>
+{% endblock %}
