@@ -1210,3 +1210,261 @@ def folder_delete():
     if "folder=" in target:
         target = url_for("index") + "#resultados"
     return redirect(target)
+
+
+# ── Catálogo de modelos y configuración ──────────────────────────────────────
+
+
+def provider_error_message(exc: Exception) -> str:
+    text = str(exc)
+    if "Missing credentials" in text or "api_key" in text:
+        return "Falta la API key de OpenRouter (configúrala en Configuración)"
+    return f"{type(exc).__name__}: {text}"
+
+
+def key_hint(api_key: str) -> str:
+    if not api_key:
+        return "sin key"
+    return f"guardada (…{api_key[-4:]})"
+
+
+@app.get("/api/models")
+def api_models():
+    provider = get_provider(load_config_or_empty())
+    try:
+        models = providers.list_models(provider["api-key"], provider["api-url"])
+    except Exception as exc:
+        response = jsonify({"error": provider_error_message(exc)})
+        response.status_code = 502
+    else:
+        response = jsonify(
+            [
+                model
+                | {
+                    "price_prompt": providers.format_price(model["pricing"].get("prompt")),
+                    "price_completion": providers.format_price(model["pricing"].get("completion")),
+                    "context": providers.format_context(model["context_length"]),
+                }
+                for model in models
+            ]
+        )
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.get("/config")
+def config_page():
+    provider = get_provider(load_config_or_empty())
+    return render_template(
+        "config.html",
+        provider={k: v for k, v in provider.items() if k != "api-key"},
+        key_hint=key_hint(provider.get("api-key") or ""),
+        has_key=bool(provider.get("api-key")),
+        config_exists=CONFIG_PATH.exists(),
+    )
+
+
+@app.post("/config")
+def config_save():
+    config = load_config_or_empty()
+    current = dict(config.get("openrouter") or {})  # conserva claves ajenas
+    provider = get_provider(config)
+
+    current["api-url"] = (request.form.get("api-url") or "").strip() or PROVIDER_DEFAULTS["api-url"]
+    current["model"] = (request.form.get("model") or "").strip() or provider["model"]
+    reasoning = (request.form.get("reasoning") or "").strip()
+    current["reasoning"] = "" if reasoning == "off" else reasoning
+
+    new_key = (request.form.get("api-key") or "").strip()
+    if request.form.get("clear_key"):
+        current["api-key"] = ""
+    elif new_key:
+        current["api-key"] = new_key
+    else:
+        current["api-key"] = provider.get("api-key") or ""
+
+    config["openrouter"] = current
+    save_config(config)
+    providers.invalidate_cache()
+    flash("Configuración guardada", "success")
+    return redirect(url_for("config_page"))
+
+
+@app.post("/config/test")
+def config_test():
+    provider = get_provider(load_config_or_empty())
+    base_url = (request.form.get("api-url") or "").strip() or provider["api-url"]
+    api_key = (request.form.get("api-key") or "").strip() or provider["api-key"]
+
+    try:
+        # Sin caché: una key incorrecta no puede dar «OK» con datos cacheados.
+        models = providers.list_models(api_key, base_url, use_cache=False)
+        # /models es público; /key es lo que valida la key de verdad.
+        key_data = providers.check_key(api_key, base_url)
+    except Exception as exc:
+        ok, message = False, f"Error: {provider_error_message(exc)}"
+    else:
+        ok = True
+        message = f"Conexión OK: {len(models)} modelos disponibles"
+        label = key_data.get("label")
+        if label:
+            message += f" · key «{label}»"
+
+    if wants_json():
+        return jsonify({"ok": ok, "message": message})
+    flash(message, "success" if ok else "error")
+    return redirect(url_for("config_page"))
+
+
+# ── Seguridad ────────────────────────────────────────────────────────────────
+
+DEFAULT_ALLOWED_HOSTS = {"arenarium", "localhost", "127.0.0.1"}
+
+
+def load_allowed_hosts() -> set[str]:
+    extra = os.environ.get("NOT_CR_ALLOWED_HOSTS", "")
+    return DEFAULT_ALLOWED_HOSTS | {h.strip().lower().rstrip(".") for h in extra.split(",") if h.strip()}
+
+
+ALLOWED_HOSTS = load_allowed_hosts()
+
+
+def host_without_port(host: str) -> str:
+    host = (host or "").lower()
+    if host.startswith("["):  # IPv6 literal
+        return host.split("]", 1)[0] + "]"
+    return host.rsplit(":", 1)[0].rstrip(".")
+
+
+@app.before_request
+def check_host_and_origin():
+    # Host permitido: protege contra DNS rebinding.
+    if host_without_port(request.host) not in ALLOWED_HOSTS:
+        abort(400)
+    # Origen en POST: una web cualquiera no puede enviar formularios a la app.
+    if request.method == "POST":
+        source = request.headers.get("Origin") or request.headers.get("Referer")
+        if source and urlparse(source).netloc.lower() != request.host.lower():
+            abort(403)
+
+
+# ── Plantillas ───────────────────────────────────────────────────────────────
+
+MONTHS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
+
+
+def humanize_date(value, now: datetime | None = None) -> str:
+    if isinstance(value, str):
+        value = parse_iso(value)
+    if value is None:
+        return ""
+    now = now or datetime.now()
+    seconds = (now - value).total_seconds()
+    days = (now.date() - value.date()).days
+    if seconds < 60:
+        return "ahora mismo"
+    if seconds < 3600:
+        return f"hace {int(seconds // 60)} min"
+    if days == 0:
+        return f"hace {int(seconds // 3600)} h"
+    if days == 1:
+        return "ayer"
+    if days < 7:
+        return f"hace {days} días"
+    if value.year == now.year:
+        return f"{value.day} {MONTHS[value.month - 1]}"
+    return f"{value.day} {MONTHS[value.month - 1]} {value.year}"
+
+
+def full_date(value) -> str:
+    if isinstance(value, str):
+        value = parse_iso(value)
+    if value is None:
+        return ""
+    return f"{value.day} {MONTHS[value.month - 1]} {value.year}, {value:%H:%M}"
+
+
+def filesize(n) -> str:
+    n = float(n or 0)
+    for unit in ("B", "KB", "MB", "GB"):
+        if n < 1024 or unit == "GB":
+            text = f"{n:.0f}" if unit == "B" else f"{n:.1f}"
+            return f"{text.replace('.', ',')} {unit}"
+        n /= 1024
+    return ""
+
+
+def duration(seconds) -> str:
+    if seconds is None:
+        return ""
+    seconds = int(round(seconds))
+    if seconds < 60:
+        return f"{seconds} s"
+    minutes, seconds = divmod(seconds, 60)
+    if minutes < 60:
+        return f"{minutes} min {seconds:02d} s"
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours} h {minutes:02d} min"
+
+
+def money(value) -> str:
+    if value is None:
+        return ""
+    if value < 0.01:
+        return f"≈ ${value:.4f}"
+    return f"≈ ${value:.2f}"
+
+
+def thousands(n) -> str:
+    return f"{int(n or 0):,}".replace(",", ".")
+
+
+app.jinja_env.filters.update(
+    humanize=humanize_date,
+    full_date=full_date,
+    filesize=filesize,
+    duration=duration,
+    money=money,
+    thousands=thousands,
+    model_short=model_short,
+    model_hue=model_hue,
+    price=providers.format_price,
+    context=providers.format_context,
+)
+
+
+@app.context_processor
+def sidebar_context():
+    """Datos de la barra lateral: carpetas con contador y trabajos activos."""
+    if request.endpoint in (None, "static") or request.endpoint.startswith("api_"):
+        return {}
+    results = list_results()
+    counts: dict[str, int] = {}
+    for entry in results:
+        if entry["folder"]:
+            counts[entry["folder"]] = counts.get(entry["folder"], 0) + 1
+    with JOBS_LOCK:
+        active = [j for j in jobs.values() if j["status"] in ACTIVE_STATUSES]
+    return {
+        "sidebar_folders": [(f, counts.get(f, 0)) for f in all_folders(results)],
+        "sidebar_active": len(active),
+        "sidebar_percent": (
+            round(sum(job_summary(j)["percent"] for j in active) / len(active)) if active else 0
+        ),
+        "no_folder": NO_FOLDER,
+    }
+
+
+# ── Arranque (tailnet) ───────────────────────────────────────────────────────
+
+if __name__ == "__main__":
+    host = os.environ.get("NOT_CR_HOST", "arenarium")
+    port = int(os.environ.get("NOT_CR_PORT", "5000"))
+    try:
+        app.run(host=host, port=port, debug=False, threaded=True)
+    except OSError as exc:  # incluye socket.gaierror
+        sys.exit(
+            f"No se pudo escuchar en {host}:{port} ({exc}). "
+            "¿Está Tailscale levantado? Para uso solo local: "
+            "NOT_CR_HOST=127.0.0.1"
+        )
