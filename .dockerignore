@@ -1,0 +1,12 @@
+.git
+.venv
+__pycache__
+**/__pycache__
+config.json
+docs
+output
+img
+output.json
+PLAN.md
+Dockerfile
+.dockerignore
