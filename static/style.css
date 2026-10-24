@@ -56,6 +56,7 @@
   --warn: oklch(62% 0.14 65);
   --err: oklch(55% 0.19 25);
   --warn-text: oklch(50% 0.12 65);
+  --ok-text: oklch(46% 0.12 155);
   --tag-l: 95%;
   --tag-c: 0.03;
   --tag-fg-l: 45%;
@@ -103,6 +104,7 @@
   --warn: oklch(80% 0.12 75);
   --err: oklch(72% 0.15 25);
   --warn-text: oklch(80% 0.12 75);
+  --ok-text: oklch(75% 0.12 155);
   --tag-l: 30%;
   --tag-c: 0.05;
   --tag-fg-l: 85%;
@@ -127,6 +129,7 @@
     --warn: oklch(80% 0.12 75);
     --err: oklch(72% 0.15 25);
     --warn-text: oklch(80% 0.12 75);
+  --ok-text: oklch(75% 0.12 155);
     --tag-l: 30%;
     --tag-c: 0.05;
     --tag-fg-l: 85%;
@@ -682,7 +685,7 @@ input[type="radio"] {
 }
 .tag--ok {
   background: var(--ok-soft);
-  color: var(--ok);
+  color: var(--ok-text);
 }
 .tag--warn {
   background: var(--warn-soft);
@@ -723,7 +726,7 @@ input[type="radio"] {
 }
 .pill--done {
   background: var(--ok-soft);
-  color: var(--ok);
+  color: var(--ok-text);
 }
 .pill--error {
   background: var(--err-soft);
@@ -885,7 +888,7 @@ input[type="radio"] {
   font-variant-numeric: tabular-nums;
 }
 .job-card__state--done {
-  color: var(--ok);
+  color: var(--ok-text);
 }
 .job-card__state--error {
   color: var(--err);
@@ -1643,7 +1646,7 @@ html:not(.js) .toasts {
   font-size: 12px;
 }
 .uploads__item .ok {
-  color: var(--ok);
+  color: var(--ok-text);
 }
 .uploads__item .ko {
   color: var(--err);
@@ -2281,7 +2284,7 @@ html:not(.js) .toasts {
   font-size: 13px;
 }
 .test-result.ok {
-  color: var(--ok);
+  color: var(--ok-text);
 }
 .test-result.ko {
   color: var(--err);
