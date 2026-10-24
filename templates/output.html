@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, model_tag, star_form, delete_result_form %}
+{% block title %}{{ entry.title or entry.doc }}{% endblock %}
+{% block content_class %}content--wide{% endblock %}
+
+{% block head %}
+<script>
+  window.MathJax = {
+    tex: { inlineMath: [["\\(", "\\)"]], displayMath: [["\\[", "\\]"]], processEscapes: false },
+    options: { processHtmlClass: "arithmatex", ignoreHtmlClass: ".*" },
+    chtml: { displayAlign: "left" }
+  };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-chtml.js"></script>
+{% endblock %}
+
+{% block before_content %}
+{% set view = request.args.get('view') if request.args.get('view') in ('read', 'source', 'compare') else 'read' %}
+<div class="reader-bar" data-output="{{ entry.name }}" data-edit-url="{{ url_for('output_edit', name=entry.name) }}">
+  <a class="btn btn--ghost btn--icon" href="{{ url_for('index') }}#resultados" aria-label="Volver a la biblioteca" title="Volver">{{ icon('arrow-left') }}</a>
+  <div class="reader-bar__title">
+    <button type="button" class="title-edit js-only" data-title-display title="Click para editar el título">{{ entry.title or entry.doc }}</button>
+    <form method="post" action="{{ url_for('output_edit', name=entry.name) }}" class="reader-bar__title" data-title-form hidden>
+      <input class="input title-input" name="title" value="{{ entry.title }}" placeholder="{{ entry.doc }}" maxlength="200" aria-label="Título" data-title-input>
+    </form>
+    <form method="post" action="{{ url_for('output_edit', name=entry.name) }}" class="reader-bar__title nojs-only">
+      <input class="input title-input" name="title" value="{{ entry.title }}" placeholder="{{ entry.doc }}" maxlength="200" aria-label="Título">
+      <button class="btn btn--sm">Guardar</button>
+    </form>
+    {{ model_tag(entry.model) }}
+    {% if entry.status == 'partial' %}<span class="tag tag--err">parcial</span>{% endif %}
+    {% if entry.truncated %}<span class="tag tag--warn">⚠ {{ entry.truncated }} página{{ 's' if entry.truncated != 1 }} truncada{{ 's' if entry.truncated != 1 }}</span>{% endif %}
+    {{ star_form(entry, request.full_path.rstrip('?')) }}
+  </div>
+
+  <div class="reader-bar__actions">
+    <form method="post" action="{{ url_for('output_edit', name=entry.name) }}" class="inline-form" data-folder-form>
+      <select class="select" name="folder" aria-label="Carpeta" data-folder-select>
+        <option value="" {% if not entry.folder %}selected{% endif %}>Sin carpeta</option>
+        {% for f in folders %}<option value="{{ f }}" {% if f == entry.folder %}selected{% endif %}>{{ f }}</option>{% endfor %}
+      </select>
+      <button class="btn btn--sm nojs-only">Mover</button>
+    </form>
+    <button type="button" class="btn btn--ghost js-only" data-copy>{{ icon('copy') }} Copiar Markdown</button>
+    <a class="btn btn--ghost" href="{{ url_for('output_raw', name=entry.name) }}">{{ icon('download') }} Descargar .md</a>
+    <div class="seg" role="tablist" aria-label="Vista">
+      <a role="tab" href="?view=read" data-view-tab="read" aria-selected="{{ 'true' if view == 'read' else 'false' }}">Leer</a>
+      <a role="tab" href="?view=source" data-view-tab="source" aria-selected="{{ 'true' if view == 'source' else 'false' }}">Fuente</a>
+      {% if doc %}<a role="tab" href="?view=compare" data-view-tab="compare" aria-selected="{{ 'true' if view == 'compare' else 'false' }}">Comparar</a>{% endif %}
+    </div>
+    <button type="button" class="btn btn--ghost btn--icon js-only" data-details-toggle aria-pressed="true" aria-label="Mostrar u ocultar detalles" title="Detalles">{{ icon('settings') }}</button>
+    <details class="menu">
+      <summary aria-label="Más acciones">{{ icon('more') }}</summary>
+      <div class="menu__list">
+        {% if doc %}<a href="{{ url_for('doc_page', name=entry.doc) }}">{{ icon('file-text') }} Ir al documento</a>{% endif %}
+        {{ delete_result_form(entry.name, url_for('index') ~ '#resultados', compact=False) }}
+      </div>
+    </details>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% set view = request.args.get('view') if request.args.get('view') in ('read', 'source', 'compare') else 'read' %}
+{% if view == 'compare' and not doc %}{% set view = 'read' %}{% endif %}
+<div class="reader-layout{% if view == 'compare' %} is-compare{% endif %}" data-reader-layout>
+  <div>
+    <article class="reader" data-panel="read" {% if view != 'read' %}hidden{% endif %}>{{ html|safe }}</article>
+    <pre class="source" data-panel="source" {% if view != 'source' %}hidden{% endif %}>{% for line in source.split('\n') %}<span>{{ line }}</span>{% endfor %}</pre>
+    {% if doc %}
+    <div class="compare" data-panel="compare" {% if view != 'compare' %}hidden{% endif %}>
+      <div>{% if view == 'compare' %}<embed class="pdf-view" src="{{ url_for('doc_file', name=entry.doc) }}" type="application/pdf" title="PDF original">{% else %}<div class="pdf-view" data-pdf-src="{{ url_for('doc_file', name=entry.doc) }}"></div>{% endif %}</div>
+      <div class="compare__text"><div class="reader" data-compare-text>{% if view == 'compare' %}{{ html|safe }}{% endif %}</div></div>
+    </div>
+    {% endif %}
+    <textarea hidden data-source>{{ source }}</textarea>
+  </div>
+
+  <aside class="details card" aria-label="Detalles" data-details>
+    <h2>Detalles</h2>
+    <dl>
+      <dt>Documento</dt><dd>{% if doc %}<a href="{{ url_for('doc_page', name=entry.doc) }}">{{ entry.doc }}</a>{% else %}{{ entry.doc }} <span class="tag">PDF eliminado</span>{% endif %}</dd>
+      <dt>Modelo</dt><dd class="mono" style="font-size:12px">{{ entry.model or '—' }}</dd>
+      <dt>Razonamiento</dt><dd>{{ meta.reasoning or '—' }}</dd>
+      <dt>Páginas</dt><dd>{{ meta.pages or (doc.pages if doc else None) or '—' }}</dd>
+      {% if meta.truncated_pages %}<dt>Truncadas</dt><dd>{{ meta.truncated_pages|join(', ') }}</dd>{% endif %}
+      <dt>Tokens</dt><dd>{% if tokens.total %}{{ tokens.total|thousands }} <span class="muted">({{ tokens.prompt|thousands }} + {{ tokens.completion|thousands }})</span>{% else %}—{% endif %}</dd>
+      <dt>Coste</dt><dd>{{ meta.get('estimated_cost')|money if meta.get('estimated_cost') is not none else '—' }}</dd>
+      <dt>Duración</dt><dd>{{ duration|duration if duration is not none else '—' }}</dd>
+      <dt>Fecha</dt><dd><time datetime="{{ entry.date.isoformat() }}">{{ entry.date|full_date }}</time></dd>
+      <dt>Carpeta</dt><dd data-folder-label>{{ entry.folder or 'Sin carpeta' }}</dd>
+      <dt>Archivo</dt><dd class="mono" style="font-size:11px">{{ entry.name }}.md</dd>
+    </dl>
+    {% if meta.error %}<p class="tag tag--err" style="white-space:normal">{{ meta.error }}</p>{% endif %}
+    <form method="post" action="{{ url_for('output_edit', name=entry.name) }}" data-note-form>
+      <div class="field" style="margin-bottom:4px">
+        <label for="note">Nota</label>
+        <textarea class="textarea" id="note" name="note" maxlength="1000" placeholder="Una nota corta sobre este resultado" data-note>{{ entry.note }}</textarea>
+      </div>
+      <div class="save-state" data-note-state aria-live="polite"></div>
+      <button class="btn btn--sm nojs-only">Guardar nota</button>
+    </form>
+  </aside>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='output.js') }}"></script>
+{% endblock %}
