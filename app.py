@@ -1484,6 +1484,17 @@ def thousands(n) -> str:
     return f"{int(n or 0):,}".replace(",", ".")
 
 
+# Lo que acepta el selector de archivos (9.1): extensiones y tipos MIME.
+app.jinja_env.globals["upload_accept"] = ",".join(
+    sorted(converting.SUPPORTED_EXTENSIONS)
+    + [
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "image/*",
+    ]
+)
+
 app.jinja_env.filters.update(
     humanize=humanize_date,
     full_date=full_date,

@@ -7,7 +7,7 @@
   <div>
     <h1>{{ doc.name }}</h1>
     <div class="sub num">
-      {% if doc.pages %}{{ doc.pages }} págs · {% endif %}{{ doc.size|filesize }} · subido <time datetime="{{ doc.uploaded.isoformat() }}" title="{{ doc.uploaded|full_date }}">{{ doc.uploaded|humanize }}</time>
+      {% if doc.source_label %}<span class="tag tag--source" title="Convertido a PDF al subirlo">{{ doc.source_label }}</span> {% endif %}{% if doc.pages %}{{ doc.pages }} págs · {% endif %}{{ doc.size|filesize }} · subido <time datetime="{{ doc.uploaded.isoformat() }}" title="{{ doc.uploaded|full_date }}">{{ doc.uploaded|humanize }}</time>
     </div>
   </div>
   <div class="actions">
@@ -16,6 +16,7 @@
       <summary aria-label="Más acciones">{{ icon('more') }}</summary>
       <div class="menu__list">
         <a href="{{ url_for('doc_file', name=doc.name) }}" target="_blank" rel="noopener">{{ icon('external-link') }} Abrir PDF</a>
+        {% if doc.original %}<a href="{{ url_for('doc_original', name=doc.name) }}">{{ icon('download') }} Descargar original</a>{% endif %}
         {{ delete_doc_form(doc.name, results|length, button_class='danger') }}
       </div>
     </details>
@@ -25,7 +26,10 @@
 <div class="doc-layout">
   <div>
     <embed class="pdf-view" src="{{ url_for('doc_file', name=doc.name) }}" type="application/pdf" title="Vista previa de {{ doc.name }}.pdf">
-    <a class="pdf-view__link" href="{{ url_for('doc_file', name=doc.name) }}" target="_blank" rel="noopener">{{ icon('external-link') }} Abrir PDF en pestaña nueva</a>
+    <div class="pdf-view__links">
+      <a class="pdf-view__link" href="{{ url_for('doc_file', name=doc.name) }}" target="_blank" rel="noopener">{{ icon('external-link') }} Abrir PDF en pestaña nueva</a>
+      {% if doc.original %}<a class="pdf-view__link" href="{{ url_for('doc_original', name=doc.name) }}">{{ icon('download') }} Descargar original ({{ doc.original }})</a>{% endif %}
+    </div>
   </div>
 
   <aside class="doc-side">

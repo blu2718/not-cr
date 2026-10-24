@@ -388,14 +388,21 @@
       var xhr = new XMLHttpRequest();
       xhr.open("POST", uploadForm.action);
       xhr.setRequestHeader("Accept", "application/json");
+      var needsConversion = !/\.pdf$/i.test(file.name);
       xhr.upload.onprogress = function (event) {
         if (!event.lengthComputable) return;
         var percent = Math.round(100 * event.loaded / event.total);
         bar.style.width = percent + "%";
         state.textContent = percent + "%";
       };
+      // Enviado: los DOCX/PPTX/imágenes se convierten a PDF antes de responder.
+      xhr.upload.onload = function () {
+        state.textContent = needsConversion ? "Convirtiendo…" : "Procesando…";
+        bar.parentNode.classList.add("progress--indeterminate");
+      };
       function finish(ok, reason) {
         bar.style.width = "100%";
+        bar.parentNode.classList.remove("progress--indeterminate");
         bar.parentNode.classList.add(ok ? "progress--done" : "progress--error");
         state.textContent = ok ? "✓" : "✗";
         state.className = "state " + (ok ? "ok" : "ko");

@@ -699,6 +699,14 @@ input[type="radio"] {
   background: var(--accent-soft);
   color: var(--accent);
 }
+.tag--source {
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 16px;
+  vertical-align: 1px;
+}
 
 .pill {
   display: inline-flex;
@@ -1598,6 +1606,10 @@ html:not(.js) .toasts {
   background: var(--surface);
   font: 600 20px var(--font-serif);
 }
+.dropveil__hint {
+  color: var(--muted);
+  font: 400 14px var(--font-ui);
+}
 .uploads {
   position: fixed;
   right: var(--s-5);
@@ -1772,6 +1784,11 @@ html:not(.js) .toasts {
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   background: var(--surface-2);
+}
+.pdf-view__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-1) var(--s-4);
 }
 .pdf-view__link {
   display: inline-flex;

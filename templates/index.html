@@ -14,8 +14,8 @@
   </div>
   <div class="actions">
     <form method="post" action="{{ url_for('upload') }}" enctype="multipart/form-data" id="upload-form" class="upload-form">
-      <input type="file" name="files" id="file-input" multiple accept="application/pdf,.pdf" class="upload-input">
-      <label for="file-input" class="btn btn--primary btn--lg js-only" tabindex="0">{{ icon('upload') }} Subir PDFs</label>
+      <input type="file" name="files" id="file-input" multiple accept="{{ upload_accept }}" class="upload-input">
+      <label for="file-input" class="btn btn--primary btn--lg js-only" tabindex="0">{{ icon('upload') }} Subir archivos</label>
       <button class="btn btn--primary btn--lg nojs-only">{{ icon('upload') }} Subir</button>
     </form>
   </div>
@@ -72,7 +72,7 @@
           </a>
           <a class="doc-card__name" href="{{ url_for('doc_page', name=doc.name) }}" title="{{ doc.name }}">{{ doc.name }}</a>
           <div class="doc-card__meta">
-            {% if doc.pages %}{{ doc.pages }} págs · {% endif %}{{ doc.size|filesize }} · {{ doc.results }} resultado{{ 's' if doc.results != 1 }}
+            {% if doc.source_label %}<span class="tag tag--source" title="Convertido desde {{ doc.original }}">{{ doc.source_label }}</span> {% endif %}{% if doc.pages %}{{ doc.pages }} págs · {% endif %}{{ doc.size|filesize }} · {{ doc.results }} resultado{{ 's' if doc.results != 1 }}
           </div>
         </article>
       {% endfor %}
@@ -100,6 +100,7 @@
               <td><img class="thumb-sm" src="{{ thumb_url(doc.name, doc.version) }}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"></td>
               <td>
                 <a class="name" href="{{ url_for('doc_page', name=doc.name) }}">{{ doc.name }}</a>
+                {% if doc.source_label %}<span class="tag tag--source" title="Convertido desde {{ doc.original }}">{{ doc.source_label }}</span>{% endif %}
                 <div class="row-job" data-doc-job {% if not job %}hidden{% endif %}>
                   <span class="muted" style="font-size:12px" data-doc-job-state>{% if job %}{{ job_state_text(job) }}{% endif %}</span>
                   {{ progress(job.percent if job else 0, mini=True, attrs='data-doc-job-bar') }}
@@ -137,7 +138,7 @@
       <button class="btn" form="bulk-docs">Aplicar</button>
     </div>
   {% else %}
-    {% call empty('') %}Arrastra PDFs aquí o pulsa <strong>Subir PDFs</strong>.{% endcall %}
+    {% call empty('') %}Arrastra archivos aquí o pulsa <strong>Subir archivos</strong>.<br><span class="muted">PDF, Word (DOCX), PowerPoint (PPTX) o imágenes.</span>{% endcall %}
   {% endif %}
 </section>
 
@@ -272,7 +273,7 @@
 
 {# Velo de arrastrar y soltar + panel de subidas #}
 <div class="dropveil" data-dropveil hidden>
-  <div class="dropveil__box">{{ icon('upload', 20) }} Suelta los PDFs para subirlos</div>
+  <div class="dropveil__box">{{ icon('upload', 20) }} Suelta los archivos para subirlos<span class="dropveil__hint">PDF, Word, PowerPoint o imágenes</span></div>
 </div>
 <div class="uploads" data-uploads hidden aria-live="polite">
   <div class="uploads__head"><span data-uploads-title>Subiendo</span><button type="button" class="btn btn--ghost btn--icon btn--sm" data-uploads-close aria-label="Cerrar">{{ icon('x') }}</button></div>
