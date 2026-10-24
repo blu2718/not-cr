@@ -316,6 +316,7 @@ class JobsTests(WebappTestCase):
             on_event("status", {"step": "page", "index": 1, "total": 1})
             on_event("usage", {"prompt_tokens": 10, "completion_tokens": 5, "cost": 0.5})
             on_event("warning", {"page": 1, "total": 1, "message": "x"})
+            on_event("status", {"step": "saving"})
             processing_text.to_md("hola", output_name)
 
         with patch.object(app.main, "run_ai_ocr", side_effect=ok_run):
@@ -323,6 +324,7 @@ class JobsTests(WebappTestCase):
 
         meta = self.meta(job["output_name"])
         self.assertEqual((meta["status"], meta["reasoning"], meta["pages"]), ("done", "low", 1))
+        self.assertEqual(app.job_summary(job)["total"], 1)
         self.assertEqual(meta["truncated_pages"], [1])
         self.assertEqual(meta["estimated_cost"], 0.5)
         self.assertEqual(job["events"][-1][0], "done")
@@ -367,6 +369,14 @@ class SecurityTests(WebappTestCase):
 
         self.client.post("/config", data={"api-url": "https://openrouter.ai/api/v1", "api-key": "", "clear_key": "1"})
         self.assertEqual(app.load_config()["openrouter"]["api-key"], "")
+
+    def test_connection_test_never_echoes_key_fragments(self):
+        app.save_config({"openrouter": {"api-key": "sk-or-v1-secret"}})
+        with patch.object(providers, "list_models", return_value=[{}]), \
+                patch.object(providers, "check_key", return_value={"label": "sk-or-v1-sec...ret"}):
+            body = self.client.post("/config/test", headers={"Accept": "application/json"}).json
+        self.assertTrue(body["ok"])
+        self.assertNotIn("sk-or", body["message"])
 
     def test_api_models_without_key_is_502(self):
         response = self.client.get("/api/models")

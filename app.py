@@ -242,7 +242,8 @@ def _run_job(job: dict, pdf_path: Path, provider: dict, model: str, reasoning: s
 
     def on_event(kind, payload):
         if kind == "status":
-            job["progress"] = payload
+            # «saving» no trae total/índice: se conservan los de la última página.
+            job["progress"] = {**job["progress"], **payload}
         elif kind == "page_time":
             job["page_times"].append(payload)
         elif kind == "usage":
@@ -1308,7 +1309,8 @@ def config_test():
         ok = True
         message = f"Conexión OK: {len(models)} modelos disponibles"
         label = key_data.get("label")
-        if label:
+        # En keys sin nombre, OpenRouter usa como etiqueta un trozo de la propia key.
+        if label and not label.startswith("sk-"):
             message += f" · key «{label}»"
 
     if wants_json():
