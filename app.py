@@ -33,6 +33,7 @@ from pdf2image import convert_from_path, pdfinfo_from_path
 from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.utils import secure_filename
 
+import converting
 import main
 import processing_text
 import providers
@@ -544,12 +545,16 @@ def doc_info(name: str) -> dict:
         except OSError:
             pass
     uploaded = parse_iso(data.get("uploaded")) or datetime.fromtimestamp(stat.st_mtime)
+    source = data.get("source") if data.get("source") in converting.KIND_LABELS else None
     return {
         "name": name,
         "pages": data.get("pages"),
         "size": stat.st_size,
         "uploaded": uploaded,
         "version": int(stat.st_mtime),  # rompe la caché del navegador de la miniatura
+        "source": source,  # None si se subió como PDF
+        "source_label": converting.KIND_LABELS.get(source),
+        "original": data.get("original") if source else None,
     }
 
 
@@ -567,40 +572,75 @@ def unique_stem(stem: str) -> str:
     return candidate
 
 
+def originals_dir() -> Path:
+    return DOCS_DIR / ".originals"
+
+
+def original_path(name: str) -> Path | None:
+    """Archivo original (DOCX/PPTX/imagen) de un documento convertido, si lo hay."""
+    for extension in sorted(converting.SUPPORTED_EXTENSIONS - converting.PDF_EXTENSIONS):
+        path = originals_dir() / f"{name}{extension}"
+        if path.is_file():
+            return path
+    return None
+
+
 def save_upload(file) -> str:
-    """Valida y guarda un PDF subido. Devuelve el stem final; ValueError con el motivo."""
+    """Valida, convierte a PDF si hace falta y guarda una subida.
+
+    Devuelve el stem final; ValueError con el motivo si se rechaza.
+    """
     original = file.filename or ""
     label = original or "archivo sin nombre"
     name = secure_filename(original)
-    if not name.lower().endswith(".pdf"):
-        raise ValueError(f"{label} no es un PDF")
+    extension = Path(name).suffix.lower()
+    kind = converting.kind_of(extension)
+    if kind is None:
+        raise ValueError(f"{label}: formato no soportado (PDF, DOCX, PPTX o imagen)")
     # "__" separa las partes de los nombres de resultado.
-    stem = re.sub(r"_{2,}", "_", name[:-4])
+    stem = re.sub(r"_{2,}", "_", name[: -len(extension)])
     if not stem.strip("_."):
         raise ValueError(f"{label}: nombre de archivo no válido")
 
-    head = file.stream.read(5)
-    file.stream.seek(0)
-    if head != b"%PDF-":
-        raise ValueError(f"{label} no es un PDF")
+    incoming = DOCS_DIR / ".incoming"
+    incoming.mkdir(parents=True, exist_ok=True)
+    fd, raw = tempfile.mkstemp(dir=incoming, suffix=extension)
+    os.close(fd)
+    raw = Path(raw)
+    converted = raw.with_suffix(".pdf.tmp")
+    try:
+        file.save(raw)
+        try:
+            converting.validate(raw, kind)
+            converting.to_pdf(raw, kind, converted)
+        except converting.ConversionError as exc:
+            raise ValueError(f"{label}: {exc}") from None
+        pages = read_page_count(converted)
 
-    with UPLOAD_LOCK:
-        DOCS_DIR.mkdir(exist_ok=True)
-        stem = unique_stem(stem)
-        path = DOCS_DIR / f"{stem}.pdf"
-        file.save(path)
+        with UPLOAD_LOCK:
+            stem = unique_stem(stem)
+            os.replace(converted, DOCS_DIR / f"{stem}.pdf")
+            if kind != "pdf":
+                originals_dir().mkdir(parents=True, exist_ok=True)
+                os.replace(raw, originals_dir() / f"{stem}{extension}")
+    finally:
+        raw.unlink(missing_ok=True)
+        converted.unlink(missing_ok=True)
 
+    info = {"pages": pages, "uploaded": iso_from_timestamp(time.time())}
+    if kind != "pdf":
+        info |= {"source": kind, "original": original}
     cache_dir().mkdir(parents=True, exist_ok=True)
-    write_json_atomic(
-        cache_dir() / f"{stem}.json",
-        {"pages": read_page_count(path), "uploaded": iso_from_timestamp(time.time())},
-    )
+    write_json_atomic(cache_dir() / f"{stem}.json", info)
     return stem
 
 
 def remove_doc_cache(name: str) -> None:
     for suffix in (".json", ".jpg"):
         (cache_dir() / f"{name}{suffix}").unlink(missing_ok=True)
+    original = original_path(name)
+    if original:
+        original.unlink(missing_ok=True)
 
 
 def delete_doc(name: str, mode: str) -> int:
@@ -681,6 +721,17 @@ def doc_page(name):
 def doc_file(name):
     valid_doc(name)
     return send_from_directory(DOCS_DIR, f"{name}.pdf", mimetype="application/pdf")
+
+
+@app.get("/docs/<name>/original")
+def doc_original(name):
+    valid_doc(name)
+    path = original_path(name)
+    if path is None:
+        abort(404)
+    info = read_json(cache_dir() / f"{name}.json") or {}
+    download = secure_filename(info.get("original") or "") or path.name
+    return send_file(path, as_attachment=True, download_name=download)
 
 
 @app.get("/docs/<name>/thumb")
