@@ -325,6 +325,23 @@ html:not(.js) .js-only {
 .nav__link--add {
   color: var(--muted);
 }
+button.nav__link {
+  width: 100%;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+details > summary.nav__link {
+  list-style: none;
+  cursor: pointer;
+}
+.nav__form {
+  display: flex;
+  gap: var(--s-1);
+  padding: var(--s-1) var(--s-2);
+}
 .nav__live {
   display: flex;
   flex-direction: column;
@@ -784,7 +801,7 @@ input[type="radio"] {
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translate(-50%, 16px);
+    transform: translateY(16px);
   }
 }
 
@@ -1367,11 +1384,22 @@ input[type="radio"] {
 
 /* ── Barra de selección flotante ─────────────────────────────────────────── */
 
-.selbar {
+.selbar-wrap {
   position: fixed;
   bottom: var(--s-5);
   left: 50%;
   z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-2);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.selbar-wrap .selbar {
+  pointer-events: auto;
+}
+.selbar {
   display: flex;
   align-items: center;
   gap: var(--s-2);
@@ -1381,7 +1409,6 @@ input[type="radio"] {
   border-radius: 999px;
   background: var(--surface);
   box-shadow: var(--shadow-pop);
-  transform: translateX(-50%);
   animation: rise 200ms var(--ease);
 }
 .selbar__count {
@@ -1390,12 +1417,20 @@ input[type="radio"] {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
-html:not(.js) .selbar {
-  position: static;
+.selbar.nojs-only {
   margin-top: var(--s-4);
-  transform: none;
   border-radius: var(--r-lg);
   flex-wrap: wrap;
+  box-shadow: none;
+  animation: none;
+}
+.menu__list form {
+  margin: 0;
+}
+.upload-form {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
 }
 
 /* ── Diálogos ────────────────────────────────────────────────────────────── */
@@ -1986,7 +2021,6 @@ html:not(.js) .toasts {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 280px;
   gap: var(--s-6);
-  padding: var(--s-6) var(--s-7);
 }
 .reader-layout.details-closed {
   grid-template-columns: minmax(0, 1fr) 0;
@@ -2005,7 +2039,6 @@ html:not(.js) .toasts {
   .reader-layout,
   .reader-layout.details-closed {
     grid-template-columns: minmax(0, 1fr);
-    padding: var(--s-5) var(--s-4);
   }
   .reader-layout.details-closed .details {
     display: block;
