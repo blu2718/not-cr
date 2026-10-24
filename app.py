@@ -760,3 +760,453 @@ def docs_bulk():
         return redirect(url_for("index"))
 
     return "Acción no válida", 400
+
+
+# ── Resultados ───────────────────────────────────────────────────────────────
+
+OUTPUT_TS_RE = re.compile(r"^\d{8}-\d{6}$")
+NO_FOLDER = "/"  # valor de filtro «Sin carpeta» (una carpeta nunca contiene "/")
+SORTS = {
+    "date_desc": "Más recientes",
+    "date_asc": "Más antiguos",
+    "doc": "Documento",
+    "model": "Modelo",
+    "title": "Título",
+}
+
+
+def parse_output_name(name: str) -> tuple[str, str, str | None]:
+    """`{doc}__{slug}__{ts}` → (doc, slug, ts); un nombre legacy → (name, "", None)."""
+    parts = name.rsplit("__", 2)
+    if len(parts) == 3 and parts[0] and OUTPUT_TS_RE.match(parts[2]):
+        return parts[0], parts[1], parts[2]
+    return name, "", None
+
+
+def result_entry(name: str) -> dict:
+    md_path = OUTPUT_DIR / f"{name}.md"
+    meta = read_json(meta_path(name)) or {}
+    doc, slug, ts = parse_output_name(name)
+    doc = meta.get("doc") or doc
+    model = meta.get("model") or slug
+
+    date = parse_iso(meta.get("finished"))
+    if date is None and ts:
+        date = datetime.strptime(ts, OUTPUT_TS_FORMAT)
+    if date is None:
+        date = datetime.fromtimestamp(md_path.stat().st_mtime)
+
+    return {
+        "name": name,
+        "doc": doc,
+        "model": model,
+        "date": date,
+        "title": meta.get("title") or "",
+        "note": meta.get("note") or "",
+        "folder": meta.get("folder") or "",
+        "primary": bool(meta.get("primary")),
+        "status": meta.get("status") or "done",
+        "truncated": len(meta.get("truncated_pages") or []),
+        "doc_exists": doc_exists(doc),
+        "meta": meta,
+    }
+
+
+def list_results() -> list[dict]:
+    entries = []
+    for path in OUTPUT_DIR.glob("*.md"):
+        name = path.name[:-3]
+        if is_safe_name(name):
+            entries.append(result_entry(name))
+    return entries
+
+
+def results_for_doc(doc: str) -> list[dict]:
+    # Filtro exacto: «uno» no debe ver los resultados de «uno_dos».
+    return [entry for entry in list_results() if entry["doc"] == doc]
+
+
+def valid_result(name: str) -> Path:
+    path = OUTPUT_DIR / f"{name}.md"
+    if not is_safe_name(name) or not path.is_file():
+        abort(404)
+    return path
+
+
+def minimal_meta(name: str) -> dict:
+    doc, slug, _ts = parse_output_name(name)
+    return {"doc": doc, "model": slug, "title": "", "note": "", "folder": "", "primary": False}
+
+
+def update_meta(name: str, **changes) -> dict:
+    """Actualiza (o crea, para resultados sin sidecar) el sidecar de un resultado."""
+    with META_LOCK:
+        meta = read_json(meta_path(name)) or minimal_meta(name)
+        meta.update(changes)
+        write_json_atomic(meta_path(name), meta)
+    return meta
+
+
+def delete_result(name: str) -> None:
+    (OUTPUT_DIR / f"{name}.md").unlink(missing_ok=True)
+    meta_path(name).unlink(missing_ok=True)
+
+
+def sort_entries(entries: list[dict], sort: str) -> list[dict]:
+    if sort == "date_asc":
+        return sorted(entries, key=lambda e: e["date"])
+    if sort == "doc":
+        return sorted(entries, key=lambda e: (e["doc"].lower(), -e["date"].timestamp()))
+    if sort == "model":
+        return sorted(entries, key=lambda e: (e["model"].lower(), -e["date"].timestamp()))
+    if sort == "title":
+        return sorted(entries, key=lambda e: ((e["title"] or e["doc"]).lower(), -e["date"].timestamp()))
+    return sorted(entries, key=lambda e: e["date"], reverse=True)
+
+
+def sort_group(entries: list[dict], primary_first: bool, sort: str = "date_desc") -> list[dict]:
+    ordered = sort_entries(entries, sort)
+    if primary_first:
+        ordered.sort(key=lambda e: not e["primary"])  # sort estable: el resto conserva su orden
+    return ordered
+
+
+# ── Carpetas ─────────────────────────────────────────────────────────────────
+
+
+def folders_path() -> Path:
+    return OUTPUT_DIR / "_folders.json"
+
+
+def load_folder_list() -> list[str]:
+    data = read_json(folders_path()) or {}
+    return [f for f in data.get("folders") or [] if isinstance(f, str)]
+
+
+def all_folders(results: list[dict] | None = None) -> list[str]:
+    """Carpetas de _folders.json más las que solo aparecen en sidecars."""
+    if results is None:
+        results = list_results()
+    folders = set(load_folder_list()) | {e["folder"] for e in results if e["folder"]}
+    return sorted(folders, key=str.lower)
+
+
+def save_folder_list(folders: list[str]) -> None:
+    OUTPUT_DIR.mkdir(exist_ok=True)
+    known = set(folders) | {e["folder"] for e in list_results() if e["folder"]}
+    write_json_atomic(folders_path(), {"folders": sorted(known, key=str.lower)})
+
+
+def clean_folder_name(value: str) -> str | None:
+    name = (value or "").strip()
+    if 1 <= len(name) <= 60 and "/" not in name:
+        return name
+    return None
+
+
+def ensure_folder(name: str) -> None:
+    if name and name not in load_folder_list():
+        with META_LOCK:
+            save_folder_list(load_folder_list() + [name])
+
+
+# ── Portada ──────────────────────────────────────────────────────────────────
+
+
+def filter_results(entries: list[dict], q: str, model: str, folder: str) -> list[dict]:
+    if q:
+        needle = q.lower()
+        entries = [
+            e
+            for e in entries
+            if needle in " ".join((e["title"], e["name"], e["doc"], e["note"])).lower()
+        ]
+    if model:
+        entries = [e for e in entries if e["model"] == model]
+    if folder == NO_FOLDER:
+        entries = [e for e in entries if not e["folder"]]
+    elif folder:
+        entries = [e for e in entries if e["folder"] == folder]
+    return entries
+
+
+def group_results(entries: list[dict], view: str, sort: str) -> list[dict]:
+    ordered = sort_entries(entries, sort)
+    groups: dict[str, dict] = {}
+    for entry in ordered:
+        if view == "folder":
+            key = entry["folder"] or NO_FOLDER
+            label = entry["folder"] or "Sin carpeta"
+            group = groups.setdefault(key, {"key": key, "label": label, "doc": None, "results": []})
+        else:
+            key = entry["doc"]
+            group = groups.setdefault(
+                key,
+                {"key": key, "label": key, "doc": key, "doc_exists": entry["doc_exists"], "results": []},
+            )
+        group["results"].append(entry)
+
+    result = list(groups.values())
+    if view == "folder":
+        # «Sin carpeta» al final, el resto por nombre.
+        result.sort(key=lambda g: (g["key"] == NO_FOLDER, g["label"].lower()))
+    else:
+        for group in result:
+            group["results"].sort(key=lambda e: not e["primary"])
+    return result
+
+
+@app.get("/")
+def index():
+    q = (request.args.get("q") or "").strip()
+    model = request.args.get("model") or ""
+    folder = request.args.get("folder") or ""
+    sort = request.args.get("sort") if request.args.get("sort") in SORTS else "date_desc"
+    view = "folder" if request.args.get("view") == "folder" else "doc"
+
+    results = list_results()
+    docs = list_docs()
+    counts: dict[str, int] = {}
+    for entry in results:
+        counts[entry["doc"]] = counts.get(entry["doc"], 0) + 1
+    for doc in docs:
+        doc["results"] = counts.get(doc["name"], 0)
+
+    filtered = filter_results(results, q, model, folder)
+    provider = get_provider(load_config_or_empty())
+    return render_template(
+        "index.html",
+        docs=docs,
+        groups=group_results(filtered, view, sort),
+        results_total=len(results),
+        results_shown=len(filtered),
+        models=sorted({e["model"] for e in results if e["model"]}, key=str.lower),
+        folders=all_folders(results),
+        filters={"q": q, "model": model, "folder": folder, "sort": sort, "view": view},
+        sorts=SORTS,
+        no_folder=NO_FOLDER,
+        jobs=[job_summary(j) for j in visible_jobs()],
+        provider=provider,
+        total_pages=sum(d["pages"] or 0 for d in docs),
+    )
+
+
+# ── Vista de resultado ───────────────────────────────────────────────────────
+
+MD_EXTENSIONS = ["extra", "pymdownx.arithmatex"]
+MD_EXTENSION_CONFIGS = {"pymdownx.arithmatex": {"generic": True}}
+SANITIZE_TAGS = (set(nh3.ALLOWED_TAGS) - {"img"}) | {"sup", "sub", "hr", "dl", "dt", "dd", "abbr"}
+SANITIZE_ATTRIBUTES = {tag: set(attrs) for tag, attrs in nh3.ALLOWED_ATTRIBUTES.items()}
+for _tag, _attrs in {
+    "span": {"class"},
+    "div": {"class"},
+    "code": {"class"},
+    "pre": {"class"},
+    "a": {"class", "href", "title"},
+    "sup": {"id"},
+    "li": {"id"},
+    "ol": {"start"},
+    "th": {"style"},
+    "td": {"style"},
+    "abbr": {"title"},
+}.items():
+    SANITIZE_ATTRIBUTES.setdefault(_tag, set()).update(_attrs)
+SANITIZE_ATTRIBUTES.pop("img", None)
+IMAGE_NOTE_RE = re.compile(r"\(Imagen:([^()<]*)\)")
+
+
+def render_markdown(text: str) -> str:
+    """Markdown → HTML saneado; el LaTeX queda intacto para MathJax (.arithmatex)."""
+    html = markdown.markdown(
+        text, extensions=MD_EXTENSIONS, extension_configs=MD_EXTENSION_CONFIGS
+    )
+    # Marcadores «(Imagen: …)» del prompt como nota discreta.
+    html = IMAGE_NOTE_RE.sub(r'<span class="img-note">(Imagen:\1)</span>', html)
+    return nh3.clean(
+        html,
+        tags=SANITIZE_TAGS,
+        attributes=SANITIZE_ATTRIBUTES,
+        url_schemes={"http", "https", "mailto"},
+        filter_style_properties={"text-align"},
+    )
+
+
+@app.get("/output/<name>")
+def output_page(name):
+    path = valid_result(name)
+    entry = result_entry(name)
+    text = path.read_text(encoding="utf-8")
+    meta = entry["meta"]
+    started, finished = parse_iso(meta.get("started")), parse_iso(meta.get("finished"))
+    return render_template(
+        "output.html",
+        entry=entry,
+        meta=meta,
+        source=text,
+        html=render_markdown(text),
+        tokens=usage_totals(meta.get("usage") or []),
+        duration=(finished - started).total_seconds() if started and finished else None,
+        folders=all_folders(),
+        doc=doc_info(entry["doc"]) if entry["doc_exists"] else None,
+    )
+
+
+@app.get("/output/<name>/raw")
+def output_raw(name):
+    valid_result(name)
+    return send_from_directory(OUTPUT_DIR, f"{name}.md", as_attachment=True)
+
+
+@app.post("/output/<name>/edit")
+def output_edit(name):
+    valid_result(name)
+    changes = {}
+    if "title" in request.form:
+        changes["title"] = request.form["title"].strip()[:200]
+    if "note" in request.form:
+        changes["note"] = request.form["note"].strip()[:1000]
+    if "folder" in request.form:
+        folder = request.form["folder"].strip()
+        if folder and clean_folder_name(folder) is None:
+            message = "Nombre de carpeta no válido (1–60 caracteres, sin «/»)"
+            if wants_json():
+                return jsonify({"ok": False, "error": message}), 400
+            flash(message, "error")
+            return redirect(url_for("output_page", name=name))
+        changes["folder"] = folder
+        ensure_folder(folder)
+    update_meta(name, **changes)
+
+    if wants_json():
+        return jsonify({"ok": True, **changes})
+    flash("Cambios guardados", "success")
+    return redirect(safe_next(url_for("output_page", name=name)))
+
+
+@app.post("/output/<name>/primary")
+def output_primary(name):
+    valid_result(name)
+    entry = result_entry(name)
+    make_primary = not entry["primary"]
+    for other in results_for_doc(entry["doc"]):
+        if other["name"] != name and other["primary"]:
+            update_meta(other["name"], primary=False)
+    update_meta(name, primary=make_primary)
+    if wants_json():
+        return jsonify({"ok": True, "primary": make_primary})
+    return redirect(safe_next(url_for("output_page", name=name)))
+
+
+@app.post("/output/<name>/delete")
+def output_delete(name):
+    valid_result(name)
+    if not confirmed():
+        flash("Marca «Confirmo el borrado» para borrar", "error")
+        return redirect(url_for("output_page", name=name))
+    delete_result(name)
+    flash("Resultado borrado", "success")
+    default = url_for("index") + "#resultados"
+    target = safe_next(default)
+    # Volver a la página del resultado borrado daría 404.
+    if target.split("?")[0].split("#")[0] == url_for("output_page", name=name):
+        target = default
+    return redirect(target)
+
+
+@app.post("/output/bulk")
+def output_bulk():
+    names = [n for n in dict.fromkeys(request.form.getlist("names")) if is_safe_name(n)]
+    names = [n for n in names if (OUTPUT_DIR / f"{n}.md").is_file()]
+    action = request.form.get("action")
+    target = safe_next(url_for("index") + "#resultados")
+    if not names:
+        flash("No hay resultados seleccionados", "error")
+        return redirect(target)
+
+    if action == "move":
+        folder = (request.form.get("folder") or "").strip()
+        if folder and clean_folder_name(folder) is None:
+            flash("Nombre de carpeta no válido", "error")
+            return redirect(target)
+        ensure_folder(folder)
+        for name in names:
+            update_meta(name, folder=folder)
+        where = f"«{folder}»" if folder else "«Sin carpeta»"
+        flash(f"{plural(len(names), 'resultado')} movidos a {where}", "success")
+        return redirect(target)
+
+    if action == "delete":
+        if not confirmed():
+            flash("Marca «Confirmo el borrado» para borrar", "error")
+            return redirect(target)
+        for name in names:
+            delete_result(name)
+        flash(f"{plural(len(names), 'resultado borrado', 'resultados borrados')}", "success")
+        return redirect(target)
+
+    return "Acción no válida", 400
+
+
+@app.post("/folders")
+def folder_create():
+    target = safe_next(url_for("index") + "#resultados")
+    name = clean_folder_name(request.form.get("name"))
+    if name is None:
+        flash("Nombre de carpeta no válido (1–60 caracteres, sin «/»)", "error")
+        return redirect(target)
+    if name in all_folders():
+        flash(f"La carpeta «{name}» ya existe", "error")
+        return redirect(target)
+    with META_LOCK:
+        save_folder_list(load_folder_list() + [name])
+    flash(f"Carpeta «{name}» creada", "success")
+    return redirect(target)
+
+
+@app.post("/folders/rename")
+def folder_rename():
+    target = safe_next(url_for("index") + "#resultados")
+    old = (request.form.get("old") or "").strip()
+    new = clean_folder_name(request.form.get("new"))
+    folders = all_folders()
+    if old not in folders:
+        flash(f"La carpeta «{old}» no existe", "error")
+        return redirect(target)
+    if new is None:
+        flash("Nombre de carpeta no válido (1–60 caracteres, sin «/»)", "error")
+        return redirect(target)
+    if new != old and new in folders:
+        flash(f"La carpeta «{new}» ya existe", "error")
+        return redirect(target)
+
+    for entry in list_results():
+        if entry["folder"] == old:
+            update_meta(entry["name"], folder=new)
+    with META_LOCK:
+        save_folder_list([f for f in load_folder_list() if f != old] + [new])
+    flash(f"Carpeta «{old}» renombrada a «{new}»", "success")
+    if "folder=" in target:
+        target = url_for("index", folder=new) + "#resultados"
+    return redirect(target)
+
+
+@app.post("/folders/delete")
+def folder_delete():
+    target = safe_next(url_for("index") + "#resultados")
+    name = (request.form.get("name") or "").strip()
+    if name not in all_folders():
+        flash(f"La carpeta «{name}» no existe", "error")
+        return redirect(target)
+    # Nunca borra resultados: pasan a «Sin carpeta».
+    moved = 0
+    for entry in list_results():
+        if entry["folder"] == name:
+            update_meta(entry["name"], folder="")
+            moved += 1
+    with META_LOCK:
+        OUTPUT_DIR.mkdir(exist_ok=True)
+        write_json_atomic(folders_path(), {"folders": [f for f in load_folder_list() if f != name]})
+    flash(f"Carpeta «{name}» eliminada · {plural(moved, 'resultado')} sin carpeta", "success")
+    if "folder=" in target:
+        target = url_for("index") + "#resultados"
+    return redirect(target)
