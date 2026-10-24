@@ -1,0 +1,8 @@
+{
+    "openrouter": {
+        "api-url": "https://openrouter.ai/api/v1",
+        "api-key": "",
+        "model": "qwen/qwen3-vl-235b-a22b-instruct",
+        "reasoning": ""
+    }
+}
