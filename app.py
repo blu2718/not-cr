@@ -2,6 +2,7 @@ import json
 import os
 import re
 import secrets
+import socket
 import sys
 import tempfile
 import threading
@@ -1461,6 +1462,9 @@ if __name__ == "__main__":
     host = os.environ.get("NOT_CR_HOST", "arenarium")
     port = int(os.environ.get("NOT_CR_PORT", "5000"))
     try:
+        # Werkzeug captura los errores de bind y sale sin explicar nada, así que
+        # se comprueba antes que el nombre resuelve (MagicDNS requiere Tailscale).
+        socket.getaddrinfo(host, port)
         app.run(host=host, port=port, debug=False, threaded=True)
     except OSError as exc:  # incluye socket.gaierror
         sys.exit(
