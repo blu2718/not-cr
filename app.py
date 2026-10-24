@@ -481,3 +481,282 @@ def api_jobs():
     response = jsonify([job_summary(job) for job in visible_jobs(doc)])
     response.headers["Cache-Control"] = "no-store"
     return response
+
+
+# ── Documentos ───────────────────────────────────────────────────────────────
+
+UPLOAD_LOCK = threading.Lock()
+THUMB_WIDTH = 360
+
+
+def cache_dir() -> Path:
+    return DOCS_DIR / ".cache"
+
+
+def is_safe_name(name: str) -> bool:
+    return bool(name) and secure_filename(name) == name
+
+
+def doc_exists(name: str) -> bool:
+    return is_safe_name(name) and (DOCS_DIR / f"{name}.pdf").is_file()
+
+
+def valid_doc(name: str) -> Path:
+    if not doc_exists(name):
+        abort(404)
+    return DOCS_DIR / f"{name}.pdf"
+
+
+def read_page_count(path: Path) -> int | None:
+    try:
+        return int(pdfinfo_from_path(str(path))["Pages"])
+    except Exception:
+        return None
+
+
+def doc_info(name: str) -> dict:
+    path = DOCS_DIR / f"{name}.pdf"
+    stat = path.stat()
+    info_path = cache_dir() / f"{name}.json"
+    data = read_json(info_path) or {}
+    if "pages" not in data:
+        # PDF copiado a mano en docs/: se calcula una vez y se guarda.
+        data = {
+            "pages": read_page_count(path),
+            "uploaded": data.get("uploaded") or iso_from_timestamp(stat.st_mtime),
+        }
+        try:
+            cache_dir().mkdir(parents=True, exist_ok=True)
+            write_json_atomic(info_path, data)
+        except OSError:
+            pass
+    uploaded = parse_iso(data.get("uploaded")) or datetime.fromtimestamp(stat.st_mtime)
+    return {
+        "name": name,
+        "pages": data.get("pages"),
+        "size": stat.st_size,
+        "uploaded": uploaded,
+        "version": int(stat.st_mtime),  # rompe la caché del navegador de la miniatura
+    }
+
+
+def list_docs() -> list[dict]:
+    docs = [doc_info(p.stem) for p in DOCS_DIR.glob("*.pdf") if is_safe_name(p.stem)]
+    docs.sort(key=lambda d: d["uploaded"], reverse=True)
+    return docs
+
+
+def unique_stem(stem: str) -> str:
+    candidate, n = stem, 2
+    while (DOCS_DIR / f"{candidate}.pdf").exists():
+        candidate = f"{stem}-{n}"
+        n += 1
+    return candidate
+
+
+def save_upload(file) -> str:
+    """Valida y guarda un PDF subido. Devuelve el stem final; ValueError con el motivo."""
+    original = file.filename or ""
+    label = original or "archivo sin nombre"
+    name = secure_filename(original)
+    if not name.lower().endswith(".pdf"):
+        raise ValueError(f"{label} no es un PDF")
+    # "__" separa las partes de los nombres de resultado.
+    stem = re.sub(r"_{2,}", "_", name[:-4])
+    if not stem.strip("_."):
+        raise ValueError(f"{label}: nombre de archivo no válido")
+
+    head = file.stream.read(5)
+    file.stream.seek(0)
+    if head != b"%PDF-":
+        raise ValueError(f"{label} no es un PDF")
+
+    with UPLOAD_LOCK:
+        DOCS_DIR.mkdir(exist_ok=True)
+        stem = unique_stem(stem)
+        path = DOCS_DIR / f"{stem}.pdf"
+        file.save(path)
+
+    cache_dir().mkdir(parents=True, exist_ok=True)
+    write_json_atomic(
+        cache_dir() / f"{stem}.json",
+        {"pages": read_page_count(path), "uploaded": iso_from_timestamp(time.time())},
+    )
+    return stem
+
+
+def remove_doc_cache(name: str) -> None:
+    for suffix in (".json", ".jpg"):
+        (cache_dir() / f"{name}{suffix}").unlink(missing_ok=True)
+
+
+def delete_doc(name: str, mode: str) -> int:
+    """Borra el PDF (y con mode="all" también sus resultados). Devuelve cuántos resultados borró."""
+    (DOCS_DIR / f"{name}.pdf").unlink(missing_ok=True)
+    remove_doc_cache(name)
+    removed = 0
+    if mode == "all":
+        for entry in results_for_doc(name):
+            delete_result(entry["name"])
+            removed += 1
+    return removed
+
+
+def plural(n: int, singular: str, plural_form: str | None = None) -> str:
+    return f"{n} {singular if n == 1 else (plural_form or singular + 's')}"
+
+
+@app.post("/upload")
+def upload():
+    files = [f for f in request.files.getlist("files") if f and f.filename]
+
+    if wants_json():
+        if not files:
+            return jsonify({"ok": False, "error": "No se recibió ningún archivo"}), 400
+        try:
+            return jsonify({"ok": True, "name": save_upload(files[0])})
+        except ValueError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 400
+
+    if not files:
+        flash("No se seleccionó ningún archivo", "error")
+        return redirect(url_for("index"))
+
+    saved, rejected = [], []
+    for file in files:
+        try:
+            saved.append(save_upload(file))
+        except ValueError as exc:
+            rejected.append(str(exc))
+
+    message = plural(len(saved), "subido")
+    if rejected:
+        message += f" · {plural(len(rejected), 'rechazado')}: " + "; ".join(rejected)
+    flash(message, "error" if rejected else "success")
+
+    if len(saved) == 1 and len(files) == 1:
+        return redirect(url_for("doc_page", name=saved[0]))
+    return redirect(url_for("index"))
+
+
+@app.errorhandler(RequestEntityTooLarge)
+def too_large(_exc):
+    message = "La subida supera el límite de 500 MB"
+    if wants_json():
+        return jsonify({"ok": False, "error": message}), 413
+    flash(message, "error")
+    return redirect(url_for("index"))
+
+
+@app.get("/docs/<name>")
+def doc_page(name):
+    valid_doc(name)
+    provider = get_provider(load_config_or_empty())
+    results = results_for_doc(name)
+    return render_template(
+        "doc.html",
+        doc=doc_info(name),
+        results=sort_group(results, primary_first=True),
+        jobs=[job_summary(j) for j in visible_jobs(name)],
+        provider=provider,
+        default_info=providers.get_cached_model(provider.get("model") or ""),
+        folders=all_folders(),
+    )
+
+
+@app.get("/docs/<name>/file")
+def doc_file(name):
+    valid_doc(name)
+    return send_from_directory(DOCS_DIR, f"{name}.pdf", mimetype="application/pdf")
+
+
+@app.get("/docs/<name>/thumb")
+def doc_thumb(name):
+    path = valid_doc(name)
+    thumb = cache_dir() / f"{name}.jpg"
+    if not thumb.exists():
+        try:
+            images = convert_from_path(
+                str(path), first_page=1, last_page=1, size=(THUMB_WIDTH, None)
+            )
+        except Exception:
+            abort(404)
+        if not images:
+            abort(404)
+        cache_dir().mkdir(parents=True, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=cache_dir(), suffix=".jpg")
+        os.close(fd)
+        try:
+            images[0].convert("RGB").save(tmp, "JPEG", quality=80)
+            os.replace(tmp, thumb)
+        except BaseException:
+            Path(tmp).unlink(missing_ok=True)
+            raise
+    return send_file(thumb, mimetype="image/jpeg", max_age=86400)
+
+
+def confirmed() -> bool:
+    return request.form.get("confirm") in ("1", "on", "yes")
+
+
+@app.post("/docs/<name>/delete")
+def doc_delete(name):
+    valid_doc(name)
+    mode = request.form.get("mode")
+    if mode not in ("pdf", "all"):
+        return "Modo de borrado no válido", 400
+    if not confirmed():
+        flash("Marca «Confirmo el borrado» para borrar", "error")
+        return redirect(url_for("doc_page", name=name))
+    if doc_has_active_job(name):
+        flash(f"{name} tiene un trabajo en curso; no se puede borrar todavía", "error")
+        return redirect(url_for("doc_page", name=name))
+
+    removed = delete_doc(name, mode)
+    if mode == "all":
+        flash(f"Borrado {name}.pdf y {plural(removed, 'resultado')}", "success")
+    else:
+        flash(f"Borrado {name}.pdf (se conservan sus resultados)", "success")
+    return redirect(url_for("index"))
+
+
+@app.post("/docs/bulk")
+def docs_bulk():
+    names = [n for n in dict.fromkeys(request.form.getlist("names")) if doc_exists(n)]
+    action = request.form.get("action")
+    if not names:
+        flash("No hay documentos seleccionados", "error")
+        return redirect(url_for("index"))
+
+    if action == "process":
+        try:
+            model, reasoning, provider = prepare_run(request.form)
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("index"))
+        for name in names:
+            start_job(name, model, reasoning, provider)
+        flash(f"{plural(len(names), 'documento')} en cola con {model}", "success")
+        return redirect(url_for("index"))
+
+    if action in ("delete_pdf", "delete_all"):
+        if not confirmed():
+            flash("Marca «Confirmo el borrado» para borrar", "error")
+            return redirect(url_for("index"))
+        mode = "all" if action == "delete_all" else "pdf"
+        deleted, skipped, removed = [], [], 0
+        for name in names:
+            if doc_has_active_job(name):
+                skipped.append(name)
+                continue
+            removed += delete_doc(name, mode)
+            deleted.append(name)
+        message = f"{plural(len(deleted), 'PDF borrado', 'PDFs borrados')}"
+        if mode == "all":
+            message += f" y {plural(removed, 'resultado')}"
+        if skipped:
+            message += f" · omitidos por tener un trabajo en curso: {', '.join(skipped)}"
+        flash(message, "error" if skipped else "success")
+        return redirect(url_for("index"))
+
+    return "Acción no válida", 400
