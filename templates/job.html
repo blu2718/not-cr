@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, model_tag, progress %}
+{% block title %}{{ job.doc }} · {{ job.model|model_short }}{% endblock %}
+
+{% block content %}
+<div data-job="{{ job.id }}" data-job-status="{{ summary.status }}"
+     data-started="{{ job.started or '' }}" data-finished="{{ job.finished or '' }}"
+     data-stream="{{ url_for('job_stream', job_id=job.id) }}"
+     data-output-base="{{ url_for('index') }}output/"
+     data-pricing='{{ (job.pricing or {})|tojson }}'>
+
+  <header class="page-head">
+    <div>
+      <h1>{% if doc %}<a href="{{ url_for('doc_page', name=job.doc) }}" style="color:inherit">{{ job.doc }}</a>{% else %}{{ job.doc }}{% endif %}</h1>
+      <div class="job-head">
+        {{ model_tag(job.model) }}
+        {% if job.reasoning %}<span class="tag">razonamiento: {{ job.reasoning }}</span>{% endif %}
+        <span class="pill {% if summary.status == 'running' %}pill--running{% elif summary.status == 'done' %}pill--done{% elif summary.status == 'error' %}pill--error{% endif %}" data-pill>
+          {% if summary.status == 'queued' %}En cola{% elif summary.status == 'running' %}Procesando{% elif summary.status == 'done' %}Listo{% else %}Error{% endif %}
+        </span>
+        <span class="tag tag--warn" data-warn-count hidden></span>
+      </div>
+    </div>
+    <div class="actions">
+      <a class="btn btn--ghost" href="{{ url_for('index') }}">{{ icon('arrow-left') }} Biblioteca</a>
+    </div>
+  </header>
+
+  {# Bloque de progreso: se sustituye por la tarjeta final al terminar #}
+  <section class="card job-progress" data-progress-block aria-label="Progreso">
+    <div class="job-progress__top">
+      <span class="bigpct" data-percent>0%</span>
+      <span class="job-progress__step" data-step aria-live="polite">{% if summary.status == 'queued' %}En cola{% else %}Preparando…{% endif %}</span>
+      <span class="job-progress__stats">
+        <span data-eta></span>
+        <span title="Tiempo transcurrido">{{ icon('clock') }} <span class="num" data-clock>0:00</span></span>
+      </span>
+    </div>
+    <div data-bar-wrap hidden>{{ progress(0, label='Páginas procesadas', attrs='data-bar') }}</div>
+    <div class="pagemap" data-pagemap aria-label="Mapa de páginas"></div>
+    <div class="job-usage" data-usage hidden></div>
+  </section>
+
+  <section class="card job-final job-final--ok" data-final-ok hidden>
+    <span class="job-final__icon">{{ icon('check', 20) }}</span>
+    <div class="job-final__text">
+      <strong>Transcripción lista</strong>
+      <span class="muted num" data-final-summary></span>
+    </div>
+    <div class="job-final__actions">
+      <a class="btn btn--primary btn--lg" data-final-open href="#">{{ icon('eye') }} Abrir resultado</a>
+      {% if doc %}<a class="btn" data-final-compare href="#">{{ icon('columns') }} Comparar con el PDF</a>{% endif %}
+      {% if doc %}<a class="btn btn--ghost" href="{{ url_for('doc_page', name=job.doc) }}#procesar">{{ icon('play') }} Procesar con otro modelo</a>{% endif %}
+    </div>
+  </section>
+
+  <section class="card job-final job-final--err" data-final-err hidden role="alert">
+    <span class="job-final__icon">{{ icon('alert', 20) }}</span>
+    <div class="job-final__text">
+      <strong>La transcripción falló</strong>
+      <span class="msg mono" data-final-error></span>
+    </div>
+    <div class="job-final__actions">
+      <a class="btn" data-final-partial href="#" hidden>{{ icon('eye') }} Ver resultado parcial</a>
+      {% if doc %}<a class="btn btn--ghost" href="{{ url_for('doc_page', name=job.doc) }}#procesar">{{ icon('play') }} Reintentar</a>{% endif %}
+    </div>
+  </section>
+
+  <div class="tabs">
+    <div class="seg" role="tablist" aria-label="Vista">
+      <button type="button" role="tab" id="tab-live" aria-controls="panel-live" aria-selected="true" data-tab="live">Texto en vivo</button>
+      <button type="button" role="tab" id="tab-log" aria-controls="panel-log" aria-selected="false" data-tab="log">Registro</button>
+    </div>
+    <label class="check muted" data-follow-wrap><input type="checkbox" checked data-follow> Seguir</label>
+  </div>
+  <pre class="live" id="panel-live" role="tabpanel" aria-labelledby="tab-live" data-live></pre>
+  <pre class="log" id="panel-log" role="tabpanel" aria-labelledby="tab-log" data-log hidden></pre>
+
+  <noscript><p class="muted">El progreso en vivo necesita JavaScript. Recarga la página para ver el estado.</p></noscript>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='job.js') }}"></script>
+{% endblock %}
